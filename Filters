@@ -1,12 +1,14 @@
 ! Title: Private Filters Bloggerpemula
 ! Description: Filters to Block Ads
 ! Expires: 4 days
-! Last modified: Tuesday , 06 Nov 2024 02:20
+! Last modified: Tuesday , 09 Nov 2024 22:57
 ! Homepage: https://free4u.nurul-huda.or.id/
 
 ! Whitelisted Sites
 @@||tradingview.com^$1p
 @@||recaptcha.net^
+@@||youtube.com/api/
+@@||play.google.com^
 
 ! Adblock Detected 
 shortit.pw##+js(set, detectAdblock, noopFunc)
@@ -29,4 +31,5 @@ juragan.film##.idmuvi-topbanner-aftermenu
 juragan.film##.idmuvi-topbanner
 juragan.film##.idmuvi-topplayer
 tpi.li,oii.la##html > div
+fc-lc.xyz###iframe_id
 clk.kim##.text-left
