@@ -1,7 +1,7 @@
 ! Title: Private Filters Bloggerpemula
 ! Description: Filters to Block Ads
 ! Expires: 4 days
-! Last modified: Tuesday , 09 Nov 2024 22:57
+! Last modified: Sunday , 15 Dec 2024 02:12
 ! Homepage: https://free4u.nurul-huda.or.id/
 
 ! Whitelisted Sites
@@ -9,6 +9,7 @@
 @@||recaptcha.net^
 @@||youtube.com/api/
 @@||play.google.com^
+@@||youtube.com/youtubei/v1/log_event
 
 ! Adblock Detected 
 shortit.pw##+js(set, detectAdblock, noopFunc)
@@ -30,6 +31,51 @@ juragan.film##.pop-content
 juragan.film##.idmuvi-topbanner-aftermenu
 juragan.film##.idmuvi-topbanner
 juragan.film##.idmuvi-topplayer
+detik.com##.bottom_banner_bar
+detik.com##.scrollpage.parallaxindetail
+detik.com##.staticdetail_container
+detik.com##.billboard-top
+detik.com##.mr1.mr
+detik.com##.mr2.mr
+detik.com##.mr3.mr
+detik.com###leaderboard
+sindonews.com##.vid-ads
+cnbcindonesia.com##.py-9.flex-1.max-w-6xl.w-full.mx-auto > .undefined
+bisnis.com##.row > .billboardWrapper
+bisnis.com##.col-right.col-3.sidebar > .billboardWrapper
+bisnis.com##div.mt30 > .billboardWrapper
+bisnis.com##.mt40.billboardParallax.billboard
+bisnis.com##.-top.skyscrapper
+kompas.com##.col-xs-10
+kompas.com##.js-giant-wp-top1.clearfix.kcm__big.kcm
+kompas.com##div.clearfix.mt2.row
+kompas.com##.kcm__tower--sticky.col-offset-0.col-bs9-2
+kompas.com##.clearfix.kcm__horizontal.kcm
+kompas.com##.osmplaceonsite.ads-partner-wrap
+kompas.com##.mgidaiml.ads-partner-wrap
+kompas.com##.clearfix.kcm__rectangle.kcm
+kompas.com##.native-wrap
+tribunnews.com##.reserved_box_ads
+kompas.com##.kcm__tower.kcm
+kompas.com##.kcm__superbig.kcm
+suara.com##.bg-ads-sticky-top
+suara.com##.bg-ads-sticky-side
+suara.com##.placeholder_belt
+suara.com##div.placeholder_read_body
+pahe.ink##.svg.no-touch.js.csstransitions.csstransforms3d.csstransforms > div
+aayurvedshastra.in##div.form-group
 tpi.li,oii.la##html > div
 fc-lc.xyz###iframe_id
-clk.kim##.text-left
+clk.kim,dekhe.click##.text-left
+digest.briceka.com,clk.kim###frame
+dekhe.click,clk.kim###orquidea-slideup
+fitdynamos.com###box_728x90
+fitdynamos.com###box_300x600_1st
+fitdynamos.com###box_336x280_1st
+fitdynamos.com###box_300x250_2nd
+link.paid4link.com,shrink.icu##.blog-item
+softexia.com###top-line
+clarkgossip.com##.gmr-bannerpopup
+hownetwork.xyz###donate
+vuotlink.vip##.banner-336x280.banner
+bhulekhnaksha.org,mahikinews.com##.adb
