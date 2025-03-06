@@ -14,7 +14,7 @@
  * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
  * Modified: Added text-align option for labels, reduced width of number and text fields - March 2025
  */
-
+/*jshint multistr:true*/
 function MonkeyConfig(data) {
     var cfg = this,
         params,
