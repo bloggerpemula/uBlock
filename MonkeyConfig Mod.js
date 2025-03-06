@@ -2,7 +2,7 @@
 // @name           MonkeyConfig Mod
 // @namespace      http://odyniec.net/
 // @description    Enhanced Configuration Dialog Builder with column layout (top, bottom, left, right), custom styling, and additional input types
-// @version        1.5
+// @version        1.6
 // ==/UserScript==
 
 /*
@@ -11,9 +11,10 @@
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
  * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
- * Modified: Checkbox, number, and text inputs aligned inline with labels regardless of label length - March 2025
+ * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
+ * Modified: Added text-align option for labels, reduced width of number and text fields - March 2025
  */
-
+/*jshint multistr:true*/
 function MonkeyConfig(data) {
     var cfg = this,
         params,
@@ -295,7 +296,9 @@ MonkeyConfig.HTML = {
     },
     '_label': function (name, options) {
         var label = options.label || name.substring(0, 1).toUpperCase() + name.substring(1).replace(/_/g, ' ');
-        return '<label for="__MonkeyConfig_field_' + name + '">' + label + '</label>';
+        // Modifikasi: Tambahkan style text-align jika ada
+        var alignStyle = options.labelAlign ? ' style="text-align:' + options.labelAlign + ';"' : '';
+        return '<label for="__MonkeyConfig_field_' + name + '"' + alignStyle + '>' + label + '</label>';
     },
     'checkbox': function (name) { return '<input id="__MonkeyConfig_field_' + name + '" type="checkbox" name="' + name + '" />'; },
     'custom': function (name, options) { return options.html || ''; },
@@ -335,7 +338,6 @@ MonkeyConfig.HTML = {
 MonkeyConfig.formatters = {
     'tr': function (name, options) {
         var html = '<tr>';
-        // Modifikasi: Checkbox, number, dan text akan sejajar dengan label dalam satu td
         if (options.type === 'checkbox' || options.type === 'number' || options.type === 'text') {
             html += '<td id="__MonkeyConfig_parent_' + name + '" colspan="2" class="__MonkeyConfig_inline">' +
                 MonkeyConfig.HTML._label(name, options) + ' ' + 
@@ -356,7 +358,17 @@ MonkeyConfig.styleAdded = false;
 MonkeyConfig.res = {
     icons: {
         'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
-        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
+        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0\
+U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISW\
+XmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg\
+/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkU\
+QTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVl\
+babTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDu\
+sPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nB\
+N82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQo\
+wFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbU\
+FPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4\
+g/2e3b8AAAAASUVORK5CYII=',
         'tick': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC'
     },
     stylesheets: {
@@ -373,10 +385,11 @@ MonkeyConfig.res = {
             div.__MonkeyConfig_container table td {border:none !important;line-height:100% !important;padding:0.3em !important;text-align:left !important;vertical-align:middle !important;white-space:normal !important;}
             /* Modifikasi: Kelas untuk tata letak inline */
             div.__MonkeyConfig_container td.__MonkeyConfig_inline {display:flex !important;align-items:center !important;white-space:nowrap !important;}
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline label {margin-right:0.5em !important;flex-shrink:0 !important;}
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"],
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline label {margin-right:0.5em !important;flex-shrink:0 !important;display:block !important;}
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] {flex-grow:0 !important;}
+            /* Modifikasi: Batasi lebar input number dan text */
             div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"],
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] {flex-grow:1 !important;min-width:0 !important;}
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] {flex-grow:0 !important;width:100px !important;min-width:50px !important;}
             div.__MonkeyConfig_buttons_container {margin-top:1em !important;border-top:solid 1px #999 !important;padding-top:0.6em !important;text-align:center !important;}
             div.__MonkeyConfig_buttons_container table {width:auto !important;margin:0 auto !important;}
             div.__MonkeyConfig_buttons_container td {padding:0.3em !important;}
