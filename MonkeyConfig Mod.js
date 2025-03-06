@@ -2,7 +2,7 @@
 // @name           MonkeyConfig Mod
 // @namespace      http://odyniec.net/
 // @description    Enhanced Configuration Dialog Builder with column layout (top, bottom, left, right), custom styling, and additional input types
-// @version        1.4
+// @version        1.5
 // ==/UserScript==
 
 /*
@@ -11,6 +11,7 @@
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
  * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
+ * Modified: Checkbox, number, and text inputs aligned inline with labels regardless of label length - March 2025
  */
 
 function MonkeyConfig(data) {
@@ -334,8 +335,12 @@ MonkeyConfig.HTML = {
 MonkeyConfig.formatters = {
     'tr': function (name, options) {
         var html = '<tr>';
-        if (options.type === 'checkbox') {
-            html += '<td id="__MonkeyConfig_parent_' + name + '" colspan="2">' + MonkeyConfig.HTML._field(name, options) + ' ' + MonkeyConfig.HTML._label(name, options) + '</td>';
+        // Modifikasi: Checkbox, number, dan text akan sejajar dengan label dalam satu td
+        if (options.type === 'checkbox' || options.type === 'number' || options.type === 'text') {
+            html += '<td id="__MonkeyConfig_parent_' + name + '" colspan="2" class="__MonkeyConfig_inline">' +
+                MonkeyConfig.HTML._label(name, options) + ' ' + 
+                MonkeyConfig.HTML._field(name, options) + 
+                '</td>';
         } else if (options.type === 'group') {
             html += '<td colspan="2">' + MonkeyConfig.HTML._field(name, options) + '</td>';
         } else {
@@ -351,17 +356,7 @@ MonkeyConfig.styleAdded = false;
 MonkeyConfig.res = {
     icons: {
         'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
-        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0\
-U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISW\
-XmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg\
-/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkU\
-QTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVl\
-babTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDu\
-sPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nB\
-N82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQo\
-wFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbU\
-FPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4\
-g/2e3b8AAAAASUVORK5CYII=',
+        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
         'tick': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC'
     },
     stylesheets: {
@@ -375,15 +370,26 @@ g/2e3b8AAAAASUVORK5CYII=',
             div.__MonkeyConfig_columns {display:flex !important;justify-content:space-between !important;margin-bottom:1em !important;}
             div.__MonkeyConfig_left_column, div.__MonkeyConfig_right_column {width:48% !important;}
             div.__MonkeyConfig_container table {border-spacing:0 !important;margin:0 !important;width:100% !important;}
-            div.__MonkeyConfig_container table td {border:none !important;line-height:100% !important;padding:0.3em !important;text-align:left !important;vertical-align:top !important;white-space:nowrap !important;}
+            div.__MonkeyConfig_container table td {border:none !important;line-height:100% !important;padding:0.3em !important;text-align:left !important;vertical-align:middle !important;white-space:normal !important;}
+            /* Modifikasi: Kelas untuk tata letak inline */
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline {display:flex !important;align-items:center !important;white-space:nowrap !important;}
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline label {margin-right:0.5em !important;flex-shrink:0 !important;}
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"],
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"],
+            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] {flex-grow:1 !important;min-width:0 !important;}
             div.__MonkeyConfig_buttons_container {margin-top:1em !important;border-top:solid 1px #999 !important;padding-top:0.6em !important;text-align:center !important;}
             div.__MonkeyConfig_buttons_container table {width:auto !important;margin:0 auto !important;}
             div.__MonkeyConfig_buttons_container td {padding:0.3em !important;}
             div.__MonkeyConfig_container td.__MonkeyConfig_buttons button {appearance:button !important;-moz-appearance:button !important;background:#ccc linear-gradient(180deg,#ddd 0,#ccc 45%,#bbb 50%,#aaa 100%) !important;border-style:solid !important;border-width:1px !important;border-radius:0.5em !important;box-shadow:0 0 1px #000 !important;padding:3px 8px 3px 24px !important;white-space:nowrap !important;}
             div.__MonkeyConfig_container td.__MonkeyConfig_buttons button img {vertical-align:middle !important;}
             div.__MonkeyConfig_layer {display:table !important;position:fixed !important;}
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container td, div.__MonkeyConfig_layer div.__MonkeyConfig_container label, div.__MonkeyConfig_layer div.__MonkeyConfig_container input, div.__MonkeyConfig_layer div.__MonkeyConfig_container select, div.__MonkeyConfig_layer div.__MonkeyConfig_container textarea, div.__MonkeyConfig_layer div.__MonkeyConfig_container button {color:__FONT_COLOR__ !important;font-family:sans-serif !important;font-size:__FONT_SIZE__ !important;line-height:100% !important;margin:0 !important;vertical-align:baseline !important;}
-            div.__MonkeyConfig_container label {line-height:120% !important;vertical-align:baseline !important;}
+            div.__MonkeyConfig_layer div.__MonkeyConfig_container td, 
+            div.__MonkeyConfig_layer div.__MonkeyConfig_container label, 
+            div.__MonkeyConfig_layer div.__MonkeyConfig_container input, 
+            div.__MonkeyConfig_layer div.__MonkeyConfig_container select, 
+            div.__MonkeyConfig_layer div.__MonkeyConfig_container textarea, 
+            div.__MonkeyConfig_layer div.__MonkeyConfig_container button {color:__FONT_COLOR__ !important;font-family:sans-serif !important;font-size:__FONT_SIZE__ !important;line-height:100% !important;margin:0 !important;vertical-align:baseline !important;}
+            div.__MonkeyConfig_container label {line-height:120% !important;vertical-align:middle !important;}
             div.__MonkeyConfig_container textarea {vertical-align:text-top !important;width:100%;}
             div.__MonkeyConfig_layer div.__MonkeyConfig_container input[type="text"] {appearance:textfield !important;-moz-appearance:textfield !important;background:#fff !important;}
             div.__MonkeyConfig_layer div.__MonkeyConfig_container td.__MonkeyConfig_buttons button:hover {background:#d2d2d2 linear-gradient(180deg,#e2e2e2 0,#d2d2d2 45%,#c2c2c2 50%,#b2b2b2 100%) !important;}
