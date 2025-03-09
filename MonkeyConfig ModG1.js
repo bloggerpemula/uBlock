@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name           MonkeyConfig Mod
 // @namespace      http://odyniec.net/
-// @description    Enhanced Configuration Dialog Builder with column layout (top, bottom, left, right), custom styling, and additional input types
-// @version        1.6
+// @description    Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
+// @version        1.8
 // ==/UserScript==
 
 /*
@@ -10,11 +10,9 @@
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
- * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
- * Modified: Added text-align option for labels, reduced width of number and text fields - March 2025
+ * Modified by Grok - March 2025: Added frame width/height, improved CSS consistency, fixed checkbox visibility
  */
-/*jshint multistr:true*/
+
 function MonkeyConfig(data) {
     var cfg = this,
         params,
@@ -30,6 +28,8 @@ function MonkeyConfig(data) {
         data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel'] : data.buttons;
         data.fontSize = data.fontSize || '11pt';
         data.fontColor = data.fontColor || '#000000';
+        data.width = data.width || '600px';  // Default width
+        data.height = data.height || 'auto'; // Default height
 
         if (!data.title) {
             data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
@@ -78,17 +78,15 @@ function MonkeyConfig(data) {
     function render() {
         var html = '<div class="__MonkeyConfig_container">' +
             '<h1>' + data.title + '</h1>' +
-            '<div class="__MonkeyConfig_content">';
-
-        html += '<div class="__MonkeyConfig_top">';
+            '<div class="__MonkeyConfig_content">' +
+            '<div class="__MonkeyConfig_top">';
         for (var paramName in params) {
             if (params[paramName].column === 'top') {
                 html += MonkeyConfig.formatters.tr(paramName, params[paramName]);
             }
         }
-        html += '</div>';
-
-        html += '<div class="__MonkeyConfig_columns">' +
+        html += '</div>' +
+            '<div class="__MonkeyConfig_columns">' +
             '<div class="__MonkeyConfig_left_column">';
         for (var paramName in params) {
             if (params[paramName].column === 'left') {
@@ -101,17 +99,15 @@ function MonkeyConfig(data) {
                 html += MonkeyConfig.formatters.tr(paramName, params[paramName]);
             }
         }
-        html += '</div></div>';
-
-        html += '<table class="__MonkeyConfig_default">';
+        html += '</div></div>' +
+            '<table class="__MonkeyConfig_default">';
         for (var paramName in params) {
             if (!params[paramName].column) {
                 html += MonkeyConfig.formatters.tr(paramName, params[paramName]);
             }
         }
-        html += '</table>';
-
-        html += '<div class="__MonkeyConfig_bottom">';
+        html += '</table>' +
+            '<div class="__MonkeyConfig_bottom">';
         for (var paramName in params) {
             if (params[paramName].column === 'bottom') {
                 html += MonkeyConfig.formatters.tr(paramName, params[paramName]);
@@ -184,6 +180,14 @@ function MonkeyConfig(data) {
                         elem.value = value;
                     }
                     break;
+            }
+            elem.style.fontSize = params[paramName].fontSize || data.fontSize;
+            elem.style.color = params[paramName].fontColor || data.fontColor;
+            var label = container.querySelector('label[for="__MonkeyConfig_field_' + paramName + '"]');
+            if (label) {
+                label.style.fontSize = params[paramName].fontSize || data.fontSize;
+                label.style.color = params[paramName].fontColor || data.fontColor;
+                label.style.textAlign = params[paramName].labelAlign || 'left';
             }
         }
     }
@@ -268,7 +272,7 @@ function MonkeyConfig(data) {
         overlay.style.cssText = 'left:0;top:0;width:100%;height:100%;z-index:9999;';
         openLayer.innerHTML = render();
         container = openLayer.querySelector('.__MonkeyConfig_container');
-        openLayer.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-height:80vh;overflow-y:auto;z-index:10000;';
+        openLayer.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-height:80vh;overflow-y:auto;z-index:10000;width:' + data.width + ';height:' + data.height + ';';
         body.appendChild(overlay);
         body.appendChild(openLayer);
         openDone();
@@ -288,7 +292,7 @@ function MonkeyConfig(data) {
     init();
 }
 
-MonkeyConfig.esc = function (string) { return string.replace(/"/g, '&quot;'); };
+MonkeyConfig.esc = function (string) { return string.replace(/"/g, '"'); };
 
 MonkeyConfig.HTML = {
     '_field': function (name, options) {
@@ -296,9 +300,12 @@ MonkeyConfig.HTML = {
     },
     '_label': function (name, options) {
         var label = options.label || name.substring(0, 1).toUpperCase() + name.substring(1).replace(/_/g, ' ');
-        // Modifikasi: Tambahkan style text-align jika ada
-        var alignStyle = options.labelAlign ? ' style="text-align:' + options.labelAlign + ';"' : '';
-        return '<label for="__MonkeyConfig_field_' + name + '"' + alignStyle + '>' + label + '</label>';
+        var styles = [];
+        if (options.labelAlign) styles.push('text-align:' + options.labelAlign + ' !important');
+        if (options.fontSize) styles.push('font-size:' + options.fontSize + ' !important');
+        if (options.fontColor) styles.push('color:' + options.fontColor + ' !important');
+        var styleAttr = styles.length > 0 ? ' style="' + styles.join(';') + ';"' : '';
+        return '<label for="__MonkeyConfig_field_' + name + '"' + styleAttr + '>' + label + '</label>';
     },
     'checkbox': function (name) { return '<input id="__MonkeyConfig_field_' + name + '" type="checkbox" name="' + name + '" />'; },
     'custom': function (name, options) { return options.html || ''; },
@@ -364,7 +371,7 @@ XmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg\
 /I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkU\
 QTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVl\
 babTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDu\
-sPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nB\
+sPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1B\
 N82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQo\
 wFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbU\
 FPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4\
@@ -373,40 +380,138 @@ g/2e3b8AAAAASUVORK5CYII=',
     },
     stylesheets: {
         main: `
-            body.__MonkeyConfig_window {appearance:window !important;-moz-appearance:window !important;background:auto;font-family:sans-serif !important;height:100% !important;margin:0 !important;padding:0 !important;width:100% !important;}
-            div.__MonkeyConfig_container {display:flex !important;flex-direction:column !important;font-family:sans-serif !important;padding:1em !important;font-size:__FONT_SIZE__ !important;color:__FONT_COLOR__ !important;background:#eee linear-gradient(180deg,#f8f8f8 0,#ddd 100%) !important;border-radius:0.5em !important;box-shadow:2px 2px 16px #000 !important;max-width:90vw !important;}
-            body.__MonkeyConfig_window div.__MonkeyConfig_container {appearance:window !important;-moz-appearance:window !important;height:100%;width:100%;}
-            div.__MonkeyConfig_container h1 {border-bottom:solid 1px #999 !important;font-family:sans-serif !important;font-size:120% !important;margin:0 0 0.5em 0 !important;padding:0 0 0.3em 0 !important;text-align:center !important;}
-            div.__MonkeyConfig_content {flex:1 !important;overflow-y:auto !important;max-height:60vh !important;}
-            div.__MonkeyConfig_top, div.__MonkeyConfig_bottom {margin-bottom:1em !important;}
-            div.__MonkeyConfig_columns {display:flex !important;justify-content:space-between !important;margin-bottom:1em !important;}
-            div.__MonkeyConfig_left_column, div.__MonkeyConfig_right_column {width:48% !important;}
-            div.__MonkeyConfig_container table {border-spacing:0 !important;margin:0 !important;width:100% !important;}
-            div.__MonkeyConfig_container table td {border:none !important;line-height:100% !important;padding:0.3em !important;text-align:left !important;vertical-align:middle !important;white-space:normal !important;}
-            /* Modifikasi: Kelas untuk tata letak inline */
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline {display:flex !important;align-items:center !important;white-space:nowrap !important;}
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline label {margin-right:0.5em !important;flex-shrink:0 !important;display:block !important;}
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] {flex-grow:0 !important;}
-            /* Modifikasi: Batasi lebar input number dan text */
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"],
-            div.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] {flex-grow:0 !important;width:100px !important;min-width:50px !important;}
-            div.__MonkeyConfig_buttons_container {margin-top:1em !important;border-top:solid 1px #999 !important;padding-top:0.6em !important;text-align:center !important;}
-            div.__MonkeyConfig_buttons_container table {width:auto !important;margin:0 auto !important;}
-            div.__MonkeyConfig_buttons_container td {padding:0.3em !important;}
-            div.__MonkeyConfig_container td.__MonkeyConfig_buttons button {appearance:button !important;-moz-appearance:button !important;background:#ccc linear-gradient(180deg,#ddd 0,#ccc 45%,#bbb 50%,#aaa 100%) !important;border-style:solid !important;border-width:1px !important;border-radius:0.5em !important;box-shadow:0 0 1px #000 !important;padding:3px 8px 3px 24px !important;white-space:nowrap !important;}
-            div.__MonkeyConfig_container td.__MonkeyConfig_buttons button img {vertical-align:middle !important;}
-            div.__MonkeyConfig_layer {display:table !important;position:fixed !important;}
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container td, 
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container label, 
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container input, 
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container select, 
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container textarea, 
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container button {color:__FONT_COLOR__ !important;font-family:sans-serif !important;font-size:__FONT_SIZE__ !important;line-height:100% !important;margin:0 !important;vertical-align:baseline !important;}
-            div.__MonkeyConfig_container label {line-height:120% !important;vertical-align:middle !important;}
-            div.__MonkeyConfig_container textarea {vertical-align:text-top !important;width:100%;}
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container input[type="text"] {appearance:textfield !important;-moz-appearance:textfield !important;background:#fff !important;}
-            div.__MonkeyConfig_layer div.__MonkeyConfig_container td.__MonkeyConfig_buttons button:hover {background:#d2d2d2 linear-gradient(180deg,#e2e2e2 0,#d2d2d2 45%,#c2c2c2 50%,#b2b2b2 100%) !important;}
-            div.__MonkeyConfig_overlay {background-color:#000 !important;opacity:0.6 !important;position:fixed !important;}
+            /* Isolasi dasar tanpa mereset semua properti */
+            .__MonkeyConfig_layer {
+                font-family: sans-serif !important;
+                box-sizing: border-box !important;
+            }
+            .__MonkeyConfig_container {
+                display: flex !important;
+                flex-direction: column !important;
+                padding: 1em !important;
+                font-size: __FONT_SIZE__ !important;
+                color: __FONT_COLOR__ !important;
+                background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
+                border-radius: 0.5em !important;
+                box-shadow: 2px 2px 16px #000 !important;
+                max-width: 90vw !important;
+                width: inherit !important;
+                height: inherit !important;
+                position: relative !important;
+            }
+            .__MonkeyConfig_container h1 {
+                border-bottom: solid 1px #999 !important;
+                font-size: 120% !important;
+                margin: 0 0 0.5em 0 !important;
+                padding: 0 0 0.3em 0 !important;
+                text-align: center !important;
+            }
+            .__MonkeyConfig_content {
+                flex: 1 !important;
+                overflow-y: auto !important;
+                max-height: 60vh !important;
+            }
+            .__MonkeyConfig_top, .__MonkeyConfig_bottom {
+                margin-bottom: 1em !important;
+            }
+            .__MonkeyConfig_columns {
+                display: flex !important;
+                justify-content: space-between !important;
+                margin-bottom: 1em !important;
+            }
+            .__MonkeyConfig_left_column, .__MonkeyConfig_right_column {
+                width: 48% !important;
+            }
+            .__MonkeyConfig_container table {
+                border-spacing: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+            }
+            .__MonkeyConfig_container td {
+                border: none !important;
+                line-height: 100% !important;
+                padding: 0.3em !important;
+                text-align: left !important;
+                vertical-align: middle !important;
+                white-space: normal !important;
+            }
+            .__MonkeyConfig_container td.__MonkeyConfig_inline {
+                display: flex !important;
+                align-items: center !important;
+                white-space: nowrap !important;
+            }
+            .__MonkeyConfig_container td.__MonkeyConfig_inline label {
+                margin-right: 0.5em !important;
+                flex-shrink: 0 !important;
+                display: block !important;
+            }
+            .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] {
+                flex-grow: 0 !important;
+                margin: 0 0.3em 0 0 !important;
+                display: inline-block !important;
+                visibility: visible !important;
+                width: 16px !important; /* Ukuran tetap agar terlihat */
+                height: 16px !important;
+                appearance: checkbox !important; /* Pastikan tampilan default checkbox */
+                -webkit-appearance: checkbox !important;
+                -moz-appearance: checkbox !important;
+            }
+            .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"],
+            .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] {
+                flex-grow: 0 !important;
+                width: 100px !important;
+                min-width: 50px !important;
+            }
+            .__MonkeyConfig_buttons_container {
+                margin-top: 1em !important;
+                border-top: solid 1px #999 !important;
+                padding-top: 0.6em !important;
+                text-align: center !important;
+            }
+            .__MonkeyConfig_buttons_container table {
+                width: auto !important;
+                margin: 0 auto !important;
+            }
+            .__MonkeyConfig_buttons_container td {
+                padding: 0.3em !important;
+            }
+            .__MonkeyConfig_container button {
+                background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important;
+                border: solid 1px !important;
+                border-radius: 0.5em !important;
+                box-shadow: 0 0 1px #000 !important;
+                padding: 3px 8px 3px 24px !important;
+                white-space: nowrap !important;
+            }
+            .__MonkeyConfig_container button img {
+                vertical-align: middle !important;
+            }
+            .__MonkeyConfig_layer {
+                display: table !important;
+                position: fixed !important;
+            }
+            .__MonkeyConfig_container label {
+                line-height: 120% !important;
+                vertical-align: middle !important;
+                display: inline-block !important;
+            }
+            .__MonkeyConfig_container textarea {
+                vertical-align: text-top !important;
+                width: 100% !important;
+            }
+            .__MonkeyConfig_container input[type="text"],
+            .__MonkeyConfig_container input[type="number"],
+            .__MonkeyConfig_container input[type="color"] {
+                background: #fff !important;
+            }
+            .__MonkeyConfig_container button:hover {
+                background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%) !important;
+            }
+            .__MonkeyConfig_overlay {
+                background-color: #000 !important;
+                opacity: 0.6 !important;
+                position: fixed !important;
+            }
         `
     }
 };
