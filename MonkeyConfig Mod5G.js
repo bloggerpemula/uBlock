@@ -1,19 +1,24 @@
 // ==UserScript==
 // @name           MonkeyConfig Mod
+// @noframes
+// @version        1.9
 // @namespace      http://odyniec.net/
-// @description    Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types using Shadow DOM
-// @version        1.9.1
+// @description    Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
 // ==/UserScript==
-
 /*
  * MonkeyConfig Modern Reloaded Enhanced
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Added Shadow DOM for consistent styling across sites - March 2025
- * v1.9.1 - Improved textarea line breaks and label alignment - March 2025
+ * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
+ * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
+ * Modified: Added text-align option for labels, reduced width of number and text fields - March 2025
+ * Modified: Added per-parameter font-size and font-color customization - March 2025
+ * Fixed: Ensured per-parameter font-size and font-color apply correctly - March 2025
+ * Fixed: Improved Shadow DOM isolation for consistent styling across sites - March 2025
+ * Fixed: Overlay z-index to ensure dialog is clickable - March 2025
+ * Fixed: Adjusted overlay size to fit dialog content - March 2025
  */
-
 function MonkeyConfig(data) {
     var cfg = this,
         params,
@@ -22,26 +27,21 @@ function MonkeyConfig(data) {
         displayed,
         openLayer,
         shadowRoot,
-        container,
-        overlay;
+        container;
 
     function init() {
         params = data.parameters || data.params;
         data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel'] : data.buttons;
         data.fontSize = data.fontSize || '11pt';
         data.fontColor = data.fontColor || '#000000';
-        data.width = data.width || '600px';
-        data.height = data.height || 'auto';
-
+        data.width = data.width || '600px';  // Default width
+        data.height = data.height || 'auto'; // Default height
         if (!data.title) {
             data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
         }
-
         var safeTitle = data.title.replace(/[^a-zA-Z0-9]/g, '_');
         storageKey = '_MonkeyConfig_' + safeTitle + '_cfg';
-
         var storedValues = GM_getValue(storageKey) ? JSON.parse(GM_getValue(storageKey)) : {};
-
         for (var paramName in params) {
             var param = params[paramName];
             if (param.value !== undefined) {
@@ -54,12 +54,10 @@ function MonkeyConfig(data) {
                 set(paramName, '');
             }
         }
-
         if (data.menuCommand) {
             var caption = data.menuCommand !== true ? data.menuCommand : data.title;
             GM_registerMenuCommand(caption, function () { cfg.open(); });
         }
-
         cfg.open = open;
         cfg.close = close;
         cfg.get = get;
@@ -116,7 +114,6 @@ function MonkeyConfig(data) {
             }
         }
         html += '</div></div><div class="__MonkeyConfig_buttons_container"><table><tr>';
-
         for (var i = 0; i < data.buttons.length; i++) {
             html += '<td>';
             switch (data.buttons[i]) {
@@ -132,14 +129,12 @@ function MonkeyConfig(data) {
             }
             html += '</td>';
         }
-
         html += '</tr></table></div></div>';
         return html;
     }
 
     function update() {
         if (!displayed) return;
-
         for (var paramName in params) {
             var value = values[paramName];
             var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
@@ -156,11 +151,9 @@ function MonkeyConfig(data) {
                 case 'number':
                 case 'text':
                 case 'color':
+                case 'textarea':
                 case 'range':
                     elem.value = value;
-                    break;
-                case 'textarea':
-                    elem.value = value.replace(/ - /g, '\n');
                     break;
                 case 'radio':
                     var radio = shadowRoot.querySelector('[name="' + paramName + '"][value="' + value + '"]');
@@ -191,7 +184,15 @@ function MonkeyConfig(data) {
             if (label) {
                 label.style.fontSize = params[paramName].fontSize || data.fontSize;
                 label.style.color = params[paramName].fontColor || data.fontColor;
-                label.style.textAlign = params[paramName].labelAlign || 'left';
+                if (params[paramName].type === 'textarea') {
+                    label.style.textAlign = 'center';
+                    label.style.display = 'block';
+                    label.style.width = '100%';
+                } else {
+                    label.style.textAlign = 'left';
+                    label.style.display = 'inline-block';
+                    label.style.width = 'auto';
+                }
             }
         }
     }
@@ -242,7 +243,6 @@ function MonkeyConfig(data) {
                     break;
             }
         }
-
         GM_setValue(storageKey, JSON.stringify(values));
         close();
         if (data.onSave) data.onSave(values);
@@ -253,44 +253,73 @@ function MonkeyConfig(data) {
 
     function open() {
         function openDone() {
+            if (window.self !== window.top) return;
             var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
-
             if (saveBtn) saveBtn.addEventListener('click', saveClick, false);
             if (defaultsBtn) defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
             if (cancelBtn) cancelBtn.addEventListener('click', cancelClick, false);
-
             displayed = true;
             update();
+
+            // Sesuaikan ukuran overlay setelah container dirender
+            adjustOverlaySize();
+        }
+
+        function adjustOverlaySize() {
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            var containerRect = container.getBoundingClientRect();
+            overlay.style.width = (containerRect.width + 40) + 'px'; // Tambah 40px untuk margin
+            overlay.style.height = (containerRect.height + 40) + 'px'; // Tambah 40px untuk margin
+            overlay.style.left = '50%';
+            overlay.style.top = '50%';
+            overlay.style.transform = 'translate(-50%, -50%)';
         }
 
         var body = document.querySelector('body');
         openLayer = document.createElement('div');
         openLayer.className = '__MonkeyConfig_layer';
-        overlay = document.createElement('div');
-        overlay.className = '__MonkeyConfig_overlay';
-        overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:9999;background-color:#000;opacity:0.6;';
 
+        // Buat Shadow DOM
         shadowRoot = openLayer.attachShadow({ mode: 'open' });
-        shadowRoot.innerHTML = '<style>' + MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor) + '</style>' + render();
+
+        // Tambahkan overlay dan container ke dalam Shadow DOM
+        shadowRoot.innerHTML = `
+            <style>
+                :host {
+                    all: initial; /* Reset semua properti CSS ke nilai awal */
+                    display: block;
+                    font-family: Arial, sans-serif; /* Tentukan font default */
+                }
+                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
+                .__MonkeyConfig_overlay {
+                    position: absolute; /* Ubah ke absolute agar mengikuti container */
+                    background-color: #000;
+                    opacity: 0.6;
+                    z-index: 1; /* Overlay di belakang container */
+                    border-radius: 0.5em; /* Sesuaikan dengan container */
+                }
+                .__MonkeyConfig_container {
+                    position: relative; /* Pastikan container di atas overlay */
+                    z-index: 2; /* Container di depan overlay */
+                }
+            </style>
+            <div class="__MonkeyConfig_overlay"></div>
+            ${render()}
+        `;
+
         container = shadowRoot.querySelector('.__MonkeyConfig_container');
-
         openLayer.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-height:80vh;overflow-y:auto;z-index:10000;width:' + data.width + ';height:' + data.height + ';';
-
-        body.appendChild(overlay);
         body.appendChild(openLayer);
         openDone();
 
-        window.addEventListener('resize', function () {
-            overlay.style.width = window.innerWidth + 'px';
-            overlay.style.height = window.innerHeight + 'px';
-        });
+        window.addEventListener('resize', adjustOverlaySize);
     }
 
     function close() {
         if (openLayer) { openLayer.parentNode.removeChild(openLayer); openLayer = undefined; }
-        if (overlay) { overlay.parentNode.removeChild(overlay); overlay = undefined; }
         shadowRoot = undefined;
         displayed = false;
     }
@@ -318,7 +347,7 @@ MonkeyConfig.HTML = {
     'number': function (name, options) { return '<input id="__MonkeyConfig_field_' + name + '" type="number" class="__MonkeyConfig_field_number" name="' + name + '" min="' + (options.min || '') + '" max="' + (options.max || '') + '" step="' + (options.step || '1') + '" />'; },
     'text': function (name) { return '<input id="__MonkeyConfig_field_' + name + '" type="text" class="__MonkeyConfig_field_text" name="' + name + '" />'; },
     'color': function (name) { return '<input id="__MonkeyConfig_field_' + name + '" type="color" class="__MonkeyConfig_field_text" name="' + name + '" />'; },
-    'textarea': function (name, options) { return '<textarea id="__MonkeyConfig_field_' + name + '" class="__MonkeyConfig_field_text" name="' + name + '" rows="' + (options.rows || 4) + '" cols="' + (options.cols || 20) + '" style="text-align: ' + (options.labelAlign || 'left') + ';"></textarea>'; },
+    'textarea': function (name, options) { return '<textarea id="__MonkeyConfig_field_' + name + '" class="__MonkeyConfig_field_text" name="' + name + '" rows="' + (options.rows || 4) + '" cols="' + (options.cols || 20) + '"></textarea>'; },
     'range': function (name, options) { return '<input id="__MonkeyConfig_field_' + name + '" type="range" name="' + name + '" min="' + (options.min || 0) + '" max="' + (options.max || 100) + '" step="' + (options.step || 1) + '" />'; },
     'radio': function (name, options) {
         var html = '';
@@ -353,8 +382,8 @@ MonkeyConfig.formatters = {
         var html = '<tr>';
         if (options.type === 'checkbox' || options.type === 'number' || options.type === 'text') {
             html += '<td id="__MonkeyConfig_parent_' + name + '" colspan="2" class="__MonkeyConfig_inline">' +
-                MonkeyConfig.HTML._label(name, options) + ' ' + 
-                MonkeyConfig.HTML._field(name, options) + 
+                MonkeyConfig.HTML._label(name, options) + ' ' +
+                MonkeyConfig.HTML._field(name, options) +
                 '</td>';
         } else if (options.type === 'group') {
             html += '<td colspan="2">' + MonkeyConfig.HTML._field(name, options) + '</td>';
@@ -369,11 +398,16 @@ MonkeyConfig.formatters = {
 MonkeyConfig.res = {
     icons: {
         'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
-        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1BN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
+        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
         'tick': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC'
     },
     stylesheets: {
         main: `
+            :host {
+                all: initial; /* Reset semua properti CSS */
+                font-family: Arial, sans-serif; /* Font default */
+                display: block;
+            }
             .__MonkeyConfig_container {
                 display: flex;
                 flex-direction: column;
@@ -386,7 +420,7 @@ MonkeyConfig.res = {
                 max-width: 90vw;
                 width: 100%;
                 height: 100%;
-                position: relative;
+                position: relative; /* Pastikan posisi relatif untuk z-index */
                 box-sizing: border-box;
             }
             .__MonkeyConfig_container h1 {
@@ -476,13 +510,13 @@ MonkeyConfig.res = {
                 line-height: 120%;
                 vertical-align: middle;
                 display: inline-block;
-                width: 100%;
             }
             .__MonkeyConfig_container textarea {
                 vertical-align: text-top;
                 width: 100%;
                 white-space: pre-wrap;
                 resize: vertical;
+                text-align: left;
             }
             .__MonkeyConfig_container input[type="text"],
             .__MonkeyConfig_container input[type="number"],
