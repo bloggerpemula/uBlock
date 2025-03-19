@@ -1,18 +1,23 @@
 // ==UserScript==
 // @name           MonkeyConfig Mod
-// @namespace      http://odyniec.net/
-// @description    Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types using Shadow DOM
+// @noframes
 // @version        1.9
+// @namespace      http://odyniec.net/
+// @description    Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
 // ==/UserScript==
-
 /*
  * MonkeyConfig Modern Reloaded Enhanced
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Added Shadow DOM for consistent styling across sites  - March 2025
+ * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
+ * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
+ * Modified: Added text-align option for labels, reduced width of number and text fields - March 2025
+ * Modified: Added per-parameter font-size and font-color customization - March 2025
+ * Fixed: Ensured per-parameter font-size and font-color apply correctly - March 2025
+ * Fixed: Improved Shadow DOM isolation for consistent styling across sites - March 2025
+ * Fixed: Overlay z-index to ensure dialog is clickable - March 2025
  */
-
 function MonkeyConfig(data) {
     var cfg = this,
         params,
@@ -21,8 +26,7 @@ function MonkeyConfig(data) {
         displayed,
         openLayer,
         shadowRoot,
-        container,
-        overlay;
+        container;
 
     function init() {
         params = data.parameters || data.params;
@@ -31,16 +35,12 @@ function MonkeyConfig(data) {
         data.fontColor = data.fontColor || '#000000';
         data.width = data.width || '600px';  // Default width
         data.height = data.height || 'auto'; // Default height
-
         if (!data.title) {
             data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
         }
-
         var safeTitle = data.title.replace(/[^a-zA-Z0-9]/g, '_');
         storageKey = '_MonkeyConfig_' + safeTitle + '_cfg';
-
         var storedValues = GM_getValue(storageKey) ? JSON.parse(GM_getValue(storageKey)) : {};
-
         for (var paramName in params) {
             var param = params[paramName];
             if (param.value !== undefined) {
@@ -53,12 +53,10 @@ function MonkeyConfig(data) {
                 set(paramName, '');
             }
         }
-
         if (data.menuCommand) {
             var caption = data.menuCommand !== true ? data.menuCommand : data.title;
             GM_registerMenuCommand(caption, function () { cfg.open(); });
         }
-
         cfg.open = open;
         cfg.close = close;
         cfg.get = get;
@@ -115,7 +113,6 @@ function MonkeyConfig(data) {
             }
         }
         html += '</div></div><div class="__MonkeyConfig_buttons_container"><table><tr>';
-
         for (var i = 0; i < data.buttons.length; i++) {
             html += '<td>';
             switch (data.buttons[i]) {
@@ -131,17 +128,15 @@ function MonkeyConfig(data) {
             }
             html += '</td>';
         }
-
         html += '</tr></table></div></div>';
         return html;
     }
 
     function update() {
         if (!displayed) return;
-
         for (var paramName in params) {
             var value = values[paramName];
-            var elem = shadowRoot.querySelector('[name="' + paramName + '"]'); // Gunakan shadowRoot
+            var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
             if (!elem) continue;
             switch (params[paramName].type) {
                 case 'checkbox':
@@ -188,7 +183,15 @@ function MonkeyConfig(data) {
             if (label) {
                 label.style.fontSize = params[paramName].fontSize || data.fontSize;
                 label.style.color = params[paramName].fontColor || data.fontColor;
-                label.style.textAlign = params[paramName].labelAlign || 'left';
+                if (params[paramName].type === 'textarea') {
+                    label.style.textAlign = 'center';
+                    label.style.display = 'block';
+                    label.style.width = '100%';
+                } else {
+                    label.style.textAlign = 'left';
+                    label.style.display = 'inline-block';
+                    label.style.width = 'auto';
+                }
             }
         }
     }
@@ -239,7 +242,6 @@ function MonkeyConfig(data) {
                     break;
             }
         }
-
         GM_setValue(storageKey, JSON.stringify(values));
         close();
         if (data.onSave) data.onSave(values);
@@ -250,40 +252,59 @@ function MonkeyConfig(data) {
 
     function open() {
         function openDone() {
+            if (window.self !== window.top) return;
             var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
-
             if (saveBtn) saveBtn.addEventListener('click', saveClick, false);
             if (defaultsBtn) defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
             if (cancelBtn) cancelBtn.addEventListener('click', cancelClick, false);
-
             displayed = true;
             update();
         }
 
-        // Buat layer dan overlay
         var body = document.querySelector('body');
         openLayer = document.createElement('div');
         openLayer.className = '__MonkeyConfig_layer';
-        overlay = document.createElement('div');
-        overlay.className = '__MonkeyConfig_overlay';
-        overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:9999;background-color:#000;opacity:0.6;';
 
         // Buat Shadow DOM
         shadowRoot = openLayer.attachShadow({ mode: 'open' });
-        shadowRoot.innerHTML = '<style>' + MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor) + '</style>' + render();
+
+        // Tambahkan overlay dan container ke dalam Shadow DOM dengan z-index yang tepat
+        shadowRoot.innerHTML = `
+            <style>
+                :host {
+                    all: initial; /* Reset semua properti CSS ke nilai awal */
+                    display: block;
+                    font-family: Arial, sans-serif; /* Tentukan font default */
+                }
+                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
+                .__MonkeyConfig_overlay {
+                    position: fixed;
+                    left: 0;
+                    top: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background-color: #000;
+                    opacity: 0.6;
+                    z-index: 1; /* Overlay di belakang container */
+                }
+                .__MonkeyConfig_container {
+                    position: relative; /* Pastikan container di atas overlay */
+                    z-index: 2; /* Container di depan overlay */
+                }
+            </style>
+            <div class="__MonkeyConfig_overlay"></div>
+            ${render()}
+        `;
+
         container = shadowRoot.querySelector('.__MonkeyConfig_container');
-
-        // Atur posisi dan ukuran layer
         openLayer.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-height:80vh;overflow-y:auto;z-index:10000;width:' + data.width + ';height:' + data.height + ';';
-
-        // Tambahkan ke dokumen
-        body.appendChild(overlay);
         body.appendChild(openLayer);
         openDone();
 
         window.addEventListener('resize', function () {
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
             overlay.style.width = window.innerWidth + 'px';
             overlay.style.height = window.innerHeight + 'px';
         });
@@ -291,7 +312,6 @@ function MonkeyConfig(data) {
 
     function close() {
         if (openLayer) { openLayer.parentNode.removeChild(openLayer); openLayer = undefined; }
-        if (overlay) { overlay.parentNode.removeChild(overlay); overlay = undefined; }
         shadowRoot = undefined;
         displayed = false;
     }
@@ -354,8 +374,8 @@ MonkeyConfig.formatters = {
         var html = '<tr>';
         if (options.type === 'checkbox' || options.type === 'number' || options.type === 'text') {
             html += '<td id="__MonkeyConfig_parent_' + name + '" colspan="2" class="__MonkeyConfig_inline">' +
-                MonkeyConfig.HTML._label(name, options) + ' ' + 
-                MonkeyConfig.HTML._field(name, options) + 
+                MonkeyConfig.HTML._label(name, options) + ' ' +
+                MonkeyConfig.HTML._field(name, options) +
                 '</td>';
         } else if (options.type === 'group') {
             html += '<td colspan="2">' + MonkeyConfig.HTML._field(name, options) + '</td>';
@@ -375,7 +395,11 @@ MonkeyConfig.res = {
     },
     stylesheets: {
         main: `
-            /* Styling dalam Shadow DOM tidak perlu !important berlebihan */
+            :host {
+                all: initial; /* Reset semua properti CSS */
+                font-family: Arial, sans-serif; /* Font default */
+                display: block;
+            }
             .__MonkeyConfig_container {
                 display: flex;
                 flex-direction: column;
@@ -388,7 +412,7 @@ MonkeyConfig.res = {
                 max-width: 90vw;
                 width: 100%;
                 height: 100%;
-                position: relative;
+                position: relative; /* Pastikan posisi relatif untuk z-index */
                 box-sizing: border-box;
             }
             .__MonkeyConfig_container h1 {
@@ -482,6 +506,9 @@ MonkeyConfig.res = {
             .__MonkeyConfig_container textarea {
                 vertical-align: text-top;
                 width: 100%;
+                white-space: pre-wrap;
+                resize: vertical;
+                text-align: left;
             }
             .__MonkeyConfig_container input[type="text"],
             .__MonkeyConfig_container input[type="number"],
