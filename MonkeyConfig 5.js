@@ -1,9 +1,10 @@
 // ==UserScript==
-// @name           MonkeyConfig Mod
+// @name            MonkeyConfig Mod
 // @noframes
-// @version        1.9
-// @namespace      http://odyniec.net/
-// @description    Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
+// @version         2.4
+// @namespace       http://odyniec.net/
+// @contributionURL https://saweria.co/Bloggerpemula
+// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
 // ==/UserScript==
 /*
  * MonkeyConfig Modern Reloaded Enhanced
@@ -18,6 +19,12 @@
  * Fixed: Improved Shadow DOM isolation for consistent styling across sites - March 2025
  * Fixed: Overlay z-index to ensure dialog is clickable - March 2025
  * Fixed: Adjusted overlay size to fit dialog content - March 2025
+ * Added: Optional adjustOverlaySize parameter for custom overlay margin - March 2025
+ * Fixed: Enhanced Shadow DOM isolation to prevent host page CSS interference - March 2025
+ * Fixed: Moved all styling into Shadow DOM to fully isolate __MonkeyConfig_layer - March 2025
+ * Fixed: Restored overlay visibility by ensuring proper sizing and positioning - March 2025
+ * Fixed: Added debugging for menuCommand and open function - March 2025
+ * Fixed: Ensured dialog visibility with explicit CSS - March 2025
  */
 function MonkeyConfig(data) {
     var cfg = this,
@@ -30,12 +37,14 @@ function MonkeyConfig(data) {
         container;
 
     function init() {
+        console.log('MonkeyConfig: Initializing...');
         params = data.parameters || data.params;
         data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel'] : data.buttons;
         data.fontSize = data.fontSize || '11pt';
         data.fontColor = data.fontColor || '#000000';
-        data.width = data.width || '600px';  // Default width
-        data.height = data.height || 'auto'; // Default height
+        data.width = data.width || '600px';
+        data.height = data.height || 'auto';
+        data.adjustOverlaySize = data.adjustOverlaySize || null;
         if (!data.title) {
             data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
         }
@@ -56,12 +65,21 @@ function MonkeyConfig(data) {
         }
         if (data.menuCommand) {
             var caption = data.menuCommand !== true ? data.menuCommand : data.title;
-            GM_registerMenuCommand(caption, function () { cfg.open(); });
+            if (typeof GM_registerMenuCommand === 'function') {
+                console.log('MonkeyConfig: Registering menu command:', caption);
+                GM_registerMenuCommand(caption, function () {
+                    console.log('MonkeyConfig: Menu command clicked, calling open...');
+                    cfg.open();
+                });
+            } else {
+                console.error('MonkeyConfig: GM_registerMenuCommand is not available');
+            }
         }
         cfg.open = open;
         cfg.close = close;
         cfg.get = get;
         cfg.set = function (name, value) { set(name, value); update(); };
+        console.log('MonkeyConfig: Initialization complete');
     }
 
     function get(name) { return values[name]; }
@@ -135,6 +153,7 @@ function MonkeyConfig(data) {
 
     function update() {
         if (!displayed) return;
+        console.log('MonkeyConfig: Updating dialog...');
         for (var paramName in params) {
             var value = values[paramName];
             var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
@@ -198,6 +217,7 @@ function MonkeyConfig(data) {
     }
 
     function saveClick() {
+        console.log('MonkeyConfig: Save clicked');
         for (var paramName in params) {
             var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
             if (!elem) continue;
@@ -249,77 +269,153 @@ function MonkeyConfig(data) {
         location.reload();
     }
 
-    function cancelClick() { close(); }
+    function cancelClick() { 
+        console.log('MonkeyConfig: Cancel clicked');
+        close(); 
+    }
 
     function open() {
+        console.log('MonkeyConfig: Opening dialog...');
         function openDone() {
-            if (window.self !== window.top) return;
+            if (window.self !== window.top) {
+                console.log('MonkeyConfig: Not in top window, aborting');
+                return;
+            }
             var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
-            if (saveBtn) saveBtn.addEventListener('click', saveClick, false);
-            if (defaultsBtn) defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
-            if (cancelBtn) cancelBtn.addEventListener('click', cancelClick, false);
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveClick, false);
+                console.log('MonkeyConfig: Save button initialized');
+            }
+            if (defaultsBtn) {
+                defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
+                console.log('MonkeyConfig: Defaults button initialized');
+            }
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', cancelClick, false);
+                console.log('MonkeyConfig: Cancel button initialized');
+            }
             displayed = true;
             update();
 
-            // Sesuaikan ukuran overlay setelah container dirender
-            adjustOverlaySize();
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            console.log('MonkeyConfig: Overlay element:', overlay);
+            console.log('MonkeyConfig: Container element:', container);
+            if (data.adjustOverlaySize) { 
+                adjustOverlaySize(); 
+                console.log('MonkeyConfig: Adjusted overlay size');
+            } else { 
+                defaultOverlaySize(); 
+                console.log('MonkeyConfig: Set default overlay size');
+            }
         }
 
         function adjustOverlaySize() {
             var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
             var container = shadowRoot.querySelector('.__MonkeyConfig_container');
             var containerRect = container.getBoundingClientRect();
-            overlay.style.width = (containerRect.width + 40) + 'px'; // Tambah 40px untuk margin
-            overlay.style.height = (containerRect.height + 40) + 'px'; // Tambah 40px untuk margin
+            var margin = parseInt(data.adjustOverlaySize, 10) || 40;
+            overlay.style.width = (containerRect.width + margin) + 'px';
+            overlay.style.height = (containerRect.height + margin) + 'px';
             overlay.style.left = '50%';
             overlay.style.top = '50%';
             overlay.style.transform = 'translate(-50%, -50%)';
+            console.log('MonkeyConfig: Overlay size adjusted - width:', overlay.style.width, 'height:', overlay.style.height);
         }
 
-        var body = document.querySelector('body');
-        openLayer = document.createElement('div');
-        openLayer.className = '__MonkeyConfig_layer';
+        function defaultOverlaySize() {
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            var containerRect = container.getBoundingClientRect();
+            overlay.style.width = containerRect.width + 'px';
+            overlay.style.height = containerRect.height + 'px';
+            overlay.style.left = '50%';
+            overlay.style.top = '50%';
+            overlay.style.transform = 'translate(-50%, -50%)';
+            console.log('MonkeyConfig: Overlay size set - width:', overlay.style.width, 'height:', overlay.style.height);
+        }
 
-        // Buat Shadow DOM
-        shadowRoot = openLayer.attachShadow({ mode: 'open' });
-
-        // Tambahkan overlay dan container ke dalam Shadow DOM
-        shadowRoot.innerHTML = `
-            <style>
-                :host {
-                    all: initial; /* Reset semua properti CSS ke nilai awal */
-                    display: block;
-                    font-family: Arial, sans-serif; /* Tentukan font default */
-                }
-                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
-                .__MonkeyConfig_overlay {
-                    position: absolute; /* Ubah ke absolute agar mengikuti container */
-                    background-color: #000;
-                    opacity: 0.6;
-                    z-index: 1; /* Overlay di belakang container */
-                    border-radius: 0.5em; /* Sesuaikan dengan container */
-                }
-                .__MonkeyConfig_container {
-                    position: relative; /* Pastikan container di atas overlay */
-                    z-index: 2; /* Container di depan overlay */
-                }
-            </style>
-            <div class="__MonkeyConfig_overlay"></div>
-            ${render()}
-        `;
-
-        container = shadowRoot.querySelector('.__MonkeyConfig_container');
-        openLayer.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-height:80vh;overflow-y:auto;z-index:10000;width:' + data.width + ';height:' + data.height + ';';
-        body.appendChild(openLayer);
-        openDone();
-
-        window.addEventListener('resize', adjustOverlaySize);
+        try {
+            var body = document.querySelector('body');
+            if (!body) {
+                console.error('MonkeyConfig: Body not found');
+                return;
+            }
+            openLayer = document.createElement('div');
+            shadowRoot = openLayer.attachShadow({ mode: 'open' });
+            shadowRoot.innerHTML = `
+                <style>
+                    :host {
+                        all: initial;
+                        display: block !important;
+                        font-family: Arial, sans-serif;
+                    }
+                    .__MonkeyConfig_layer {
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        max-height: 80vh;
+                        overflow-y: auto;
+                        z-index: 10000 !important;
+                        width: ${data.width};
+                        height: ${data.height};
+                        contain: strict;
+                        background: transparent; /* Pastikan layer tidak menutupi */
+                    }
+                    ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
+                    .__MonkeyConfig_overlay {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.6) !important; /* Paksa overlay terlihat */
+                        z-index: 1 !important;
+                        border-radius: 0.5em;
+                        pointer-events: none;
+                    }
+                    .__MonkeyConfig_container {
+                        position: relative;
+                        z-index: 2 !important;
+                        background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
+                        width: 100%;
+                        height: auto;
+                        min-height: 100px; /* Pastikan ada tinggi minimum */
+                    }
+                </style>
+                <div class="__MonkeyConfig_layer">
+                    <div class="__MonkeyConfig_overlay"></div>
+                    ${render()}
+                </div>
+            `;
+            container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            body.appendChild(openLayer);
+            console.log('MonkeyConfig: Dialog appended to body');
+            openDone();
+            if (data.adjustOverlaySize) {
+                window.addEventListener('resize', adjustOverlaySize);
+            } else {
+                window.addEventListener('resize', defaultOverlaySize);
+            }
+        } catch (e) {
+            console.error('MonkeyConfig: Error in open function:', e);
+        }
     }
 
     function close() {
-        if (openLayer) { openLayer.parentNode.removeChild(openLayer); openLayer = undefined; }
+        console.log('MonkeyConfig: Closing dialog...');
+        if (openLayer) {
+            if (data.adjustOverlaySize) {
+                window.removeEventListener('resize', adjustOverlaySize);
+            } else {
+                window.removeEventListener('resize', defaultOverlaySize);
+            }
+            openLayer.parentNode.removeChild(openLayer);
+            openLayer = undefined;
+        }
         shadowRoot = undefined;
         displayed = false;
     }
@@ -404,9 +500,9 @@ MonkeyConfig.res = {
     stylesheets: {
         main: `
             :host {
-                all: initial; /* Reset semua properti CSS */
-                font-family: Arial, sans-serif; /* Font default */
-                display: block;
+                all: initial;
+                font-family: Arial, sans-serif;
+                display: block !important;
             }
             .__MonkeyConfig_container {
                 display: flex;
@@ -414,13 +510,14 @@ MonkeyConfig.res = {
                 padding: 1em;
                 font-size: __FONT_SIZE__;
                 color: __FONT_COLOR__;
-                background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%);
+                background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
                 border-radius: 0.5em;
                 box-shadow: 2px 2px 16px #000;
                 max-width: 90vw;
                 width: 100%;
-                height: 100%;
-                position: relative; /* Pastikan posisi relatif untuk z-index */
+                height: auto;
+                min-height: 100px;
+                position: relative;
                 box-sizing: border-box;
             }
             .__MonkeyConfig_container h1 {
@@ -529,3 +626,19 @@ MonkeyConfig.res = {
         `
     }
 };
+
+// Contoh penggunaan untuk debugging
+try {
+    console.log('MonkeyConfig: Creating instance...');
+    var config = new MonkeyConfig({
+        title: "Test Config",
+        width: '600px',
+        parameters: {
+            test: { type: 'text', label: 'Test Input', default: 'Hello' }
+        },
+        menuCommand: true
+    });
+    console.log('MonkeyConfig: Instance created');
+} catch (e) {
+    console.error('MonkeyConfig: Error creating instance:', e);
+}
