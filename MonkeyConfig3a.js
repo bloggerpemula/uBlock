@@ -1,18 +1,18 @@
 // ==UserScript==
 // @name            MonkeyConfig Mod
 // @noframes
-// @version         2.8
+// @version         2.14
 // @namespace       http://odyniec.net/
 // @contributionURL https://saweria.co/Bloggerpemula
 // @description     Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
+// @match           *://*/*
 // ==/UserScript==
 /*
  * MonkeyConfig Modern Reloaded Enhanced
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Fixed: Recalculate position after render for true centering - March 2025
- * Fixed: Overlay to cover full viewport - March 2025
+ * Fixed: Made dialog more compact, buttons visible without scrolling - March 2025
  */
 function MonkeyConfig(data) {
     var cfg = this,
@@ -22,19 +22,19 @@ function MonkeyConfig(data) {
         displayed,
         openLayer,
         shadowRoot,
-        container;
+        container,
+        overlay;
 
     function init() {
         console.log('MonkeyConfig: Initializing...');
         params = data.parameters || data.params;
         data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel'] : data.buttons;
-        data.fontSize = data.fontSize || '11pt';
-        data.fontColor = data.fontColor || '#000000';
+        data.fontSize = data.fontSize || '12pt'; // Kurangi font-size agar lebih kompak
+        data.fontColor = data.fontColor || '#333333';
         data.width = data.width || '600px';
         data.height = data.height || 'auto';
-        data.adjustOverlaySize = data.adjustOverlaySize || null;
         if (!data.title) {
-            data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
+            data.title = typeof GM_info === 'object' ? GM_info.script.name + ' Configuration' : 'Configuration';
         }
         var safeTitle = data.title.replace(/[^a-zA-Z0-9]/g, '_');
         storageKey = '_MonkeyConfig_' + safeTitle + '_cfg';
@@ -262,46 +262,55 @@ function MonkeyConfig(data) {
         close(); 
     }
 
-    function adjustOverlaySize() {
-        var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-        var container = shadowRoot.querySelector('.__MonkeyConfig_container');
-        var containerRect = container.getBoundingClientRect();
-        var margin = parseInt(data.adjustOverlaySize, 10) || 40;
-        overlay.style.width = (containerRect.width + margin) + 'px';
-        overlay.style.height = (containerRect.height + margin) + 'px';
-        overlay.style.left = '50%';
-        overlay.style.top = '50%';
-        overlay.style.transform = 'translate(-50%, -50%)';
-        console.log('MonkeyConfig: Overlay size adjusted - width:', overlay.style.width, 'height:', overlay.style.height);
-    }
-
-    function defaultOverlaySize() {
-        var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-        overlay.style.width = '100vw';
-        overlay.style.height = '100vh';
-        overlay.style.left = '0';
-        overlay.style.top = '0';
-        overlay.style.transform = 'none';
-        console.log('MonkeyConfig: Overlay size set - width: 100vw, height: 100vh');
-    }
-
     function forcePositionAndSize() {
         var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
+        var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+        var content = shadowRoot.querySelector('.__MonkeyConfig_content');
+        var buttonsContainer = shadowRoot.querySelector('.__MonkeyConfig_buttons_container');
         var viewportHeight = window.innerHeight;
         var viewportWidth = window.innerWidth;
         var dialogWidth = parseInt(data.width, 10); // Misalnya 600
-        var dialogHeight = layer.getBoundingClientRect().height; // Tinggi aktual setelah render
+        var dialogHeight = container.getBoundingClientRect().height; // Tinggi aktual container
+        var maxHeight = Math.min(viewportHeight * 0.5, 300); // Batasi tinggi maksimum agar tombol terlihat
 
-        // Paksa posisi di tengah viewport berdasarkan tinggi aktual
+        // Paksa lebar dan tinggi container
+        container.style.width = `${dialogWidth}px`;
+        container.style.minWidth = `${dialogWidth}px`;
+        container.style.maxWidth = `${dialogWidth}px`;
+        container.style.height = 'auto';
+        container.style.maxHeight = `${maxHeight}px`;
+        container.style.overflowY = 'auto';
+        // Paksa background dan font-size secara inline
+        container.style.background = 'rgba(255, 255, 255, 0.95)';
+        container.style.fontSize = data.fontSize;
+        container.style.color = data.fontColor;
+
+        // Paksa posisi layer
         layer.style.position = 'fixed';
-        layer.style.top = `${(viewportHeight - dialogHeight) / 2}px`;
-        layer.style.left = `${(viewportWidth - dialogWidth) / 2}px`;
-        layer.style.transform = 'none';
-        layer.style.width = data.width;
-        layer.style.maxWidth = data.width;
-        layer.style.height = 'auto';
+        layer.style.width = `${dialogWidth}px`;
+        layer.style.minWidth = `${dialogWidth}px`;
+        layer.style.maxWidth = `${dialogWidth}px`;
+        layer.style.height = `${dialogHeight}px`;
+        layer.style.maxHeight = `${maxHeight}px`;
+        layer.style.overflowY = 'auto';
+        layer.style.zIndex = '10000';
 
-        console.log('MonkeyConfig: Forced position - top:', layer.style.top, 'left:', layer.style.left, 'width:', layer.style.width, 'height:', dialogHeight + 'px');
+        // Hitung ulang posisi dengan tinggi aktual
+        dialogHeight = Math.min(dialogHeight, maxHeight);
+        layer.style.top = `${Math.max(0, (viewportHeight - dialogHeight) / 2)}px`;
+        layer.style.left = `${(viewportWidth - dialogWidth) / 2}px`;
+
+        // Log untuk debugging
+        var computedStyle = window.getComputedStyle(container);
+        console.log('MonkeyConfig: Forced position - top:', layer.style.top, 'left:', layer.style.left, 'width:', layer.style.width, 'height:', dialogHeight + 'px', 'max-height:', maxHeight + 'px');
+        console.log('MonkeyConfig: Container effective width:', container.getBoundingClientRect().width);
+        console.log('MonkeyConfig: Container height:', dialogHeight);
+        console.log('MonkeyConfig: Content height:', content ? content.getBoundingClientRect().height : 'null');
+        console.log('MonkeyConfig: Buttons container height:', buttonsContainer ? buttonsContainer.getBoundingClientRect().height : 'null');
+        console.log('MonkeyConfig: Container inline background:', container.style.background);
+        console.log('MonkeyConfig: Container computed background:', computedStyle.background);
+        console.log('MonkeyConfig: Container inline font size:', container.style.fontSize);
+        console.log('MonkeyConfig: Container computed font size:', computedStyle.fontSize);
     }
 
     function open() {
@@ -314,6 +323,7 @@ function MonkeyConfig(data) {
             var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
+            var buttonsContainer = shadowRoot.querySelector('.__MonkeyConfig_buttons_container');
             if (saveBtn) {
                 saveBtn.addEventListener('click', saveClick, false);
                 console.log('MonkeyConfig: Save button initialized');
@@ -329,29 +339,25 @@ function MonkeyConfig(data) {
             displayed = true;
             update();
 
-            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
             var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
-            console.log('MonkeyConfig: Layer element:', layer);
-            console.log('MonkeyConfig: Overlay element:', overlay);
-            console.log('MonkeyConfig: Container element:', container);
+            console.log('MonkeyConfig: Layer element exists:', !!layer);
+            console.log('MonkeyConfig: Overlay element exists:', !!overlay);
+            console.log('MonkeyConfig: Container element exists:', !!container);
+            console.log('MonkeyConfig: Buttons container exists:', !!buttonsContainer);
             console.log('MonkeyConfig: Viewport size - width:', window.innerWidth, 'height:', window.innerHeight);
             console.log('MonkeyConfig: Document body size - width:', document.body.scrollWidth, 'height:', document.body.scrollHeight);
-            console.log('MonkeyConfig: Layer position before force:', layer.getBoundingClientRect());
-            console.log('MonkeyConfig: Overlay position before:', overlay.getBoundingClientRect());
-            console.log('MonkeyConfig: Container position:', container.getBoundingClientRect());
+            console.log('MonkeyConfig: Layer position before force:', layer ? layer.getBoundingClientRect() : 'null');
+            console.log('MonkeyConfig: Overlay position before:', overlay ? overlay.getBoundingClientRect() : 'null');
+            console.log('MonkeyConfig: Container position:', container ? container.getBoundingClientRect() : 'null');
 
-            forcePositionAndSize(); // Paksa posisi dengan tinggi aktual
-            if (data.adjustOverlaySize) { 
-                adjustOverlaySize(); 
-                console.log('MonkeyConfig: Adjusted overlay size');
-            } else { 
-                defaultOverlaySize(); // Overlay penuh
-                console.log('MonkeyConfig: Set default overlay size');
+            if (layer && overlay && container) {
+                forcePositionAndSize(); // Paksa posisi dengan tinggi aktual
+                console.log('MonkeyConfig: Layer position after force:', layer.getBoundingClientRect());
+                console.log('MonkeyConfig: Overlay position after:', overlay.getBoundingClientRect());
+                console.log('MonkeyConfig: Buttons container position:', buttonsContainer ? buttonsContainer.getBoundingClientRect() : 'null');
+            } else {
+                console.error('MonkeyConfig: One or more elements are missing');
             }
-
-            console.log('MonkeyConfig: Layer position after force:', layer.getBoundingClientRect());
-            console.log('MonkeyConfig: Overlay position after:', overlay.getBoundingClientRect());
         }
 
         try {
@@ -360,6 +366,21 @@ function MonkeyConfig(data) {
                 console.error('MonkeyConfig: Body not found');
                 return;
             }
+            // Buat overlay di luar Shadow DOM
+            overlay = document.createElement('div');
+            overlay.className = '__MonkeyConfig_overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100vw';
+            overlay.style.height = '100vh';
+            overlay.style.background = 'rgba(0, 0, 0, 0.6)';
+            overlay.style.zIndex = '9999';
+            overlay.style.borderRadius = '0';
+            overlay.style.pointerEvents = 'none';
+            overlay.style.visibility = 'visible';
+            body.appendChild(overlay);
+
             openLayer = document.createElement('div');
             shadowRoot = openLayer.attachShadow({ mode: 'open' });
             shadowRoot.innerHTML = `
@@ -378,49 +399,38 @@ function MonkeyConfig(data) {
                     }
                     .__MonkeyConfig_layer {
                         position: fixed !important;
-                        max-height: 80vh !important;
-                        overflow-y: auto !important;
                         z-index: 10000 !important;
                         width: ${data.width} !important;
+                        min-width: ${data.width} !important;
                         max-width: ${data.width} !important;
-                        height: ${data.height} !important;
                         background: transparent !important;
-                        visibility: visible !important;
-                    }
-                    ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
-                    .__MonkeyConfig_overlay {
-                        position: fixed !important;
-                        background: rgba(0, 0, 0, 0.6) !important;
-                        z-index: 1 !important;
-                        border-radius: 0 !important;
-                        pointer-events: none !important;
                         visibility: visible !important;
                     }
                     .__MonkeyConfig_container {
                         position: relative !important;
-                        z-index: 2 !important;
-                        background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
-                        width: 100% !important;
+                        z-index: 10000 !important;
+                        background: rgba(255, 255, 255, 0.95) !important;
+                        font-size: 12pt !important;
+                        color: #333333 !important;
+                        width: ${data.width} !important;
+                        min-width: ${data.width} !important;
+                        max-width: ${data.width} !important;
                         height: auto !important;
-                        min-height: 100px !important;
+                        min-height: 80px !important;
                         visibility: visible !important;
                         border-radius: 0.5em !important;
+                        box-sizing: border-box !important;
                     }
+                    ${MonkeyConfig.res.stylesheets.main}
                 </style>
                 <div class="__MonkeyConfig_layer">
-                    <div class="__MonkeyConfig_overlay"></div>
                     ${render()}
                 </div>
             `;
             container = shadowRoot.querySelector('.__MonkeyConfig_container');
             body.appendChild(openLayer);
             console.log('MonkeyConfig: Dialog appended to body');
-            openDone();
-            if (data.adjustOverlaySize) {
-                window.addEventListener('resize', adjustOverlaySize);
-            } else {
-                window.addEventListener('resize', defaultOverlaySize);
-            }
+            setTimeout(openDone, 200); // Beri waktu untuk rendering
         } catch (e) {
             console.error('MonkeyConfig: Error in open function:', e);
         }
@@ -429,13 +439,12 @@ function MonkeyConfig(data) {
     function close() {
         console.log('MonkeyConfig: Closing dialog...');
         if (openLayer) {
-            if (data.adjustOverlaySize) {
-                window.removeEventListener('resize', adjustOverlaySize);
-            } else {
-                window.removeEventListener('resize', defaultOverlaySize);
-            }
             openLayer.parentNode.removeChild(openLayer);
             openLayer = undefined;
+        }
+        if (overlay) {
+            overlay.parentNode.removeChild(overlay);
+            overlay = undefined;
         }
         shadowRoot = undefined;
         displayed = false;
@@ -528,39 +537,41 @@ MonkeyConfig.res = {
             .__MonkeyConfig_container {
                 display: flex !important;
                 flex-direction: column !important;
-                padding: 1em !important;
-                font-size: __FONT_SIZE__ !important;
-                color: __FONT_COLOR__ !important;
-                background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
+                padding: 0.3em !important; /* Kurangi padding */
+                font-size: 12pt !important;
+                color: #333333 !important;
+                background: rgba(255, 255, 255, 0.95) !important;
                 border-radius: 0.5em !important;
                 box-shadow: 2px 2px 16px #000 !important;
-                max-width: 90vw !important;
                 width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
                 height: auto !important;
-                min-height: 100px !important;
+                min-height: 80px !important;
                 position: relative !important;
                 box-sizing: border-box !important;
                 visibility: visible !important;
             }
             .__MonkeyConfig_container h1 {
                 border-bottom: solid 1px #999 !important;
-                font-size: 120% !important;
-                margin: 0 0 0.5em 0 !important;
-                padding: 0 0 0.3em 0 !important;
+                font-size: 110% !important; /* Kurangi ukuran judul */
+                margin: 0 0 0.2em 0 !important; /* Kurangi margin */
+                padding: 0 0 0.1em 0 !important; /* Kurangi padding */
                 text-align: center !important;
+                font-weight: bold !important;
             }
             .__MonkeyConfig_content {
                 flex: 1 !important;
                 overflow-y: auto !important;
-                max-height: 60vh !important;
+                max-height: 200px !important; /* Kurangi max-height */
             }
             .__MonkeyConfig_top, .__MonkeyConfig_bottom {
-                margin-bottom: 1em !important;
+                margin-bottom: 0.2em !important; /* Kurangi margin */
             }
             .__MonkeyConfig_columns {
                 display: flex !important;
                 justify-content: space-between !important;
-                margin-bottom: 1em !important;
+                margin-bottom: 0.2em !important; /* Kurangi margin */
             }
             .__MonkeyConfig_left_column, .__MonkeyConfig_right_column {
                 width: 48% !important;
@@ -573,7 +584,7 @@ MonkeyConfig.res = {
             .__MonkeyConfig_container td {
                 border: none !important;
                 line-height: 100% !important;
-                padding: 0.3em !important;
+                padding: 0.1em !important; /* Kurangi padding */
                 text-align: left !important;
                 vertical-align: middle !important;
                 white-space: normal !important;
@@ -584,49 +595,55 @@ MonkeyConfig.res = {
                 white-space: nowrap !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline label {
-                margin-right: 0.5em !important;
+                margin-right: 0.3em !important; /* Kurangi margin */
                 flex-shrink: 0 !important;
                 display: block !important;
+                font-weight: 500 !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] {
                 flex-grow: 0 !important;
-                margin: 0 0.3em 0 0 !important;
+                margin: 0 0.2em 0 0 !important; /* Kurangi margin */
                 display: inline-block !important;
-                width: 16px !important;
-                height: 16px !important;
+                width: 14px !important; /* Kurangi ukuran */
+                height: 14px !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"],
             .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] {
                 flex-grow: 0 !important;
-                width: 100px !important;
-                min-width: 50px !important;
+                width: 80px !important; /* Kurangi lebar */
+                min-width: 40px !important;
             }
             .__MonkeyConfig_buttons_container {
-                margin-top: 1em !important;
+                margin-top: 0.2em !important; /* Kurangi margin */
                 border-top: solid 1px #999 !important;
-                padding-top: 0.6em !important;
+                padding-top: 0.2em !important; /* Kurangi padding */
                 text-align: center !important;
+                flex-shrink: 0 !important;
             }
             .__MonkeyConfig_buttons_container table {
                 width: auto !important;
                 margin: 0 auto !important;
             }
             .__MonkeyConfig_buttons_container td {
-                padding: 0.3em !important;
+                padding: 0.1em !important; /* Kurangi padding */
             }
             .__MonkeyConfig_container button {
                 background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important;
                 border: solid 1px !important;
                 border-radius: 0.5em !important;
                 box-shadow: 0 0 1px #000 !important;
-                padding: 3px 8px 3px 24px !important;
+                padding: 2px 6px 2px 20px !important; /* Kurangi padding */
                 white-space: nowrap !important;
+                font-size: 12pt !important;
+                color: #333333 !important;
             }
             .__MonkeyConfig_container button img {
                 vertical-align: middle !important;
+                width: 14px !important; /* Kurangi ukuran ikon */
+                height: 14px !important;
             }
             .__MonkeyConfig_container label {
-                line-height: 120% !important;
+                line-height: 100% !important; /* Kurangi line-height */
                 vertical-align: middle !important;
                 display: inline-block !important;
             }
