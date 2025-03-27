@@ -11,6 +11,7 @@
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
+ * v2.5 Updates - March 2025:
  * Fixed: Improved Shadow DOM isolation for consistent styling across sites - March 2025
  */
 
@@ -24,7 +25,10 @@ function MonkeyConfig(data) {
         shadowRoot,
         container,
         iframeFallback;
-    function log(message, data) {console.log(`[MonkeyConfig v2.5] ${message}`, data || '');}
+    function log(message, data) {
+        console.log(`[MonkeyConfig v2.5] ${message}`, data || '');
+    }
+
     function init() {
         params = data.parameters || data.params;
         data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel', 'homepage'] : data.buttons;
@@ -32,10 +36,14 @@ function MonkeyConfig(data) {
         data.fontColor = data.fontColor || '#000000';
         data.width = data.width || '600px';
         data.height = data.height || 'auto';
-        if (!data.title) {data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';}
+
+        if (!data.title) {
+            data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
+        }
         var safeTitle = data.title.replace(/[^a-zA-Z0-9]/g, '_');
         storageKey = '_MonkeyConfig_' + safeTitle + '_cfg';
         var storedValues = GM_getValue(storageKey) ? JSON.parse(GM_getValue(storageKey)) : {};
+
         for (var paramName in params) {
             var param = params[paramName];
             if (param.value !== undefined) {
@@ -45,24 +53,32 @@ function MonkeyConfig(data) {
             } else if (param.default !== undefined) {
                 set(paramName, param.default);
             } else {
-                set(paramName, '');}}
+                set(paramName, '');
+            }
+        }
 
         if (data.menuCommand) {
             var caption = data.menuCommand !== true ? data.menuCommand : data.title;
-            GM_registerMenuCommand(caption, function () { cfg.open(); });}
+            GM_registerMenuCommand(caption, function () { cfg.open(); });
+        }
         cfg.open = open;
         cfg.close = close;
         cfg.get = get;
-        cfg.set = function (name, value) { set(name, value); update(); };}
+        cfg.set = function (name, value) { set(name, value); update(); };
+    }
+
     function get(name) { return values[name]; }
     function set(name, value) { values[name] = value; }
+
     function setDefaults() {
         for (var paramName in params) {
             if (params[paramName].default !== undefined) {
                 set(paramName, params[paramName].default);
             }
         }
-        update();}
+        update();
+    }
+
     function render() {
         var html = '<div class="__MonkeyConfig_container">' +
             '<h1>' + data.title + '</h1>' +
@@ -169,7 +185,8 @@ function MonkeyConfig(data) {
                     } else {
                         elem.value = value;
                     }
-                    break;}
+                    break;
+            }
             elem.style.fontSize = params[paramName].fontSize || data.fontSize;
             elem.style.color = params[paramName].fontColor || data.fontColor;
             var label = root.querySelector('label[for="__MonkeyConfig_field_' + paramName + '"]');
@@ -239,31 +256,72 @@ function MonkeyConfig(data) {
         GM_setValue(storageKey, JSON.stringify(values));
         close();
         if (data.onSave) data.onSave(values);
-        location.reload();}
-    function cancelClick() { close(); }
-    function homepageClick() {window.open('https://bloggerpemula.pythonanywhere.com/', '_blank');}
+        location.reload();
+    }
+
+    function cancelClick() { 
+        close(); 
+    }
+    
+    function homepageClick() {
+        window.open('https://bloggerpemula.pythonanywhere.com/', '_blank');
+    }
+
     function open() {
         function openDone(root) {
             if (window.self !== window.top) {
                 log('Running in iframe, aborting');
-                return;}
+                return;
+            }
             var saveBtn = root.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = root.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = root.querySelector('#__MonkeyConfig_button_cancel');
             var homepageBtn = root.querySelector('#__MonkeyConfig_button_homepage');
             if (saveBtn) {
                 saveBtn.addEventListener('click', saveClick, false);
-            } else if (defaultsBtn) {
-                defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);} else if (cancelBtn) {
-                cancelBtn.addEventListener('click', cancelClick, false);} else if (homepageBtn) {
-                homepageBtn.addEventListener('click', homepageClick, false);} else displayed = true;
+                log('Save button initialized');
+            } else log('Save button not found');
+            if (defaultsBtn) {
+                defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
+                log('Defaults button initialized');
+            } else log('Defaults button not found');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', cancelClick, false);
+                log('Cancel button initialized');
+            } else log('Cancel button not found');
+            if (homepageBtn) {
+                homepageBtn.addEventListener('click', homepageClick, false);
+                log('Homepage button initialized');
+            } else log('Homepage button not found');
+            displayed = true;
             update();
+
             var overlay = root.querySelector('.__MonkeyConfig_overlay');
-            var container = root.querySelector('.__MonkeyConfig_container');}
+            var container = root.querySelector('.__MonkeyConfig_container');
+            log('Overlay properties after render', {
+                width: overlay.offsetWidth,
+                height: overlay.offsetHeight,
+                top: overlay.style.top,
+                left: overlay.style.left,
+                zIndex: overlay.style.zIndex,
+                background: overlay.style.backgroundColor
+            });
+            log('Container properties after render', {
+                width: container.offsetWidth,
+                height: container.offsetHeight,
+                top: container.style.top,
+                left: container.style.left,
+                zIndex: container.style.zIndex
+            });
+        }
+
         var body = document.querySelector('body') || document.documentElement;
         if (!body) {
             log('No suitable parent element found');
-            return;}
+            return;
+        }
+
+        // Coba Shadow DOM terlebih dahulu
         openLayer = document.createElement('div');
         openLayer.className = '__MonkeyConfig_layer';
         shadowRoot = openLayer.attachShadow({ mode: 'open' });
@@ -312,10 +370,14 @@ function MonkeyConfig(data) {
         openLayer.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; z-index: 2147483647 !important;';
         body.appendChild(openLayer);
         log('Dialog appended to body via Shadow DOM');
+
+        // Verifikasi apakah Shadow DOM gagal
         if (!container || shadowRoot.querySelector('.__MonkeyConfig_overlay').offsetHeight === 0) {
             log('Shadow DOM failed, switching to iframe fallback');
             body.removeChild(openLayer);
             shadowRoot = null;
+
+            // Fallback ke iframe
             iframeFallback = document.createElement('iframe');
             iframeFallback.style.cssText = 'position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ' + data.width + ' !important; height: ' + data.height + ' !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;';
             body.appendChild(iframeFallback);
@@ -365,7 +427,9 @@ function MonkeyConfig(data) {
             openDone(shadowRoot);
         }
     }
-    function close() {if (openLayer) { 
+
+    function close() {
+        if (openLayer) { 
             openLayer.parentNode.removeChild(openLayer); 
             openLayer = undefined; 
         }
@@ -374,8 +438,11 @@ function MonkeyConfig(data) {
         displayed = false;
     }
 
-    init();}
+    init();
+}
+
 MonkeyConfig.esc = function (string) { return string.replace(/"/g, '"'); };
+
 MonkeyConfig.HTML = {
     '_field': function (name, options) {
         return options.type && MonkeyConfig.HTML[options.type] ? options.html ? options.html.replace(/\[FIELD\]/, MonkeyConfig.HTML[options.type](name, options)) : MonkeyConfig.HTML[options.type](name, options) : '';
@@ -423,6 +490,7 @@ MonkeyConfig.HTML = {
         return html;
     }
 };
+
 MonkeyConfig.formatters = {
     'tr': function (name, options) {
         var html = '<tr>';
@@ -440,6 +508,7 @@ MonkeyConfig.formatters = {
         return html;
     }
 };
+
 MonkeyConfig.res = {
     icons: {
         'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
@@ -579,4 +648,5 @@ MonkeyConfig.res = {
                 }
             }
         `
-    }};
+    }
+};
