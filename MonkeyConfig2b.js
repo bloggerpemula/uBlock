@@ -1,19 +1,23 @@
 // ==UserScript==
 // @name            MonkeyConfig Mod
 // @noframes
-// @version         2.13
+// @version         2.4
 // @namespace       http://odyniec.net/
 // @contributionURL https://saweria.co/Bloggerpemula
-// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
-// @match           *://*/*
+// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, additional input types, improved isolation, and debug logging
 // ==/UserScript==
 /*
  * MonkeyConfig Modern Reloaded Enhanced
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Fixed: Ensured background and font styles are applied - March 2025
+ * v2.4 Updates - March 2025:
+ * - Fixed overlay height and visibility
+ * - Ensured proper centering with explicit positioning
+ * - Improved Shadow DOM isolation for h1 and other elements
+ * - Enhanced logging for style verification
  */
+
 function MonkeyConfig(data) {
     var cfg = this,
         params,
@@ -22,23 +26,30 @@ function MonkeyConfig(data) {
         displayed,
         openLayer,
         shadowRoot,
-        container,
-        overlay;
+        container;
+
+    // Fungsi logging sederhana
+    function log(message, data) {
+        console.log(`[MonkeyConfig v2.4] ${message}`, data || '');
+    }
 
     function init() {
-        console.log('MonkeyConfig: Initializing...');
+        log('Initializing MonkeyConfig');
         params = data.parameters || data.params;
-        data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel'] : data.buttons;
-        data.fontSize = data.fontSize || '14pt';
-        data.fontColor = data.fontColor || '#333333';
+        data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel', 'homepage'] : data.buttons;
+        data.fontSize = data.fontSize || '11pt';
+        data.fontColor = data.fontColor || '#000000';
         data.width = data.width || '600px';
         data.height = data.height || 'auto';
+        data.adjustOverlaySize = data.adjustOverlaySize || null;
+
         if (!data.title) {
-            data.title = typeof GM_info === 'object' ? GM_info.script.name + ' Configuration' : 'Configuration';
+            data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
         }
         var safeTitle = data.title.replace(/[^a-zA-Z0-9]/g, '_');
         storageKey = '_MonkeyConfig_' + safeTitle + '_cfg';
         var storedValues = GM_getValue(storageKey) ? JSON.parse(GM_getValue(storageKey)) : {};
+
         for (var paramName in params) {
             var param = params[paramName];
             if (param.value !== undefined) {
@@ -51,27 +62,21 @@ function MonkeyConfig(data) {
                 set(paramName, '');
             }
         }
+
         if (data.menuCommand) {
             var caption = data.menuCommand !== true ? data.menuCommand : data.title;
-            if (typeof GM_registerMenuCommand === 'function') {
-                console.log('MonkeyConfig: Registering menu command:', caption);
-                GM_registerMenuCommand(caption, function () {
-                    console.log('MonkeyConfig: Menu command clicked, calling open...');
-                    cfg.open();
-                });
-            } else {
-                console.error('MonkeyConfig: GM_registerMenuCommand is not available');
-            }
+            log('Registering menu command', caption);
+            GM_registerMenuCommand(caption, function () { cfg.open(); });
         }
         cfg.open = open;
         cfg.close = close;
         cfg.get = get;
         cfg.set = function (name, value) { set(name, value); update(); };
-        console.log('MonkeyConfig: Initialization complete');
     }
 
     function get(name) { return values[name]; }
     function set(name, value) { values[name] = value; }
+
     function setDefaults() {
         for (var paramName in params) {
             if (params[paramName].default !== undefined) {
@@ -82,6 +87,7 @@ function MonkeyConfig(data) {
     }
 
     function render() {
+        log('Rendering dialog');
         var html = '<div class="__MonkeyConfig_container">' +
             '<h1>' + data.title + '</h1>' +
             '<div class="__MonkeyConfig_content">' +
@@ -132,6 +138,9 @@ function MonkeyConfig(data) {
                 case 'save':
                     html += '<button type="button" id="__MonkeyConfig_button_save"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.tick + '" alt="Save"/> Save</button>';
                     break;
+                case 'homepage':
+                    html += '<button type="button" id="__MonkeyConfig_button_homepage"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.home + '" alt="Homepage"/> Homepage</button>';
+                    break;
             }
             html += '</td>';
         }
@@ -141,7 +150,7 @@ function MonkeyConfig(data) {
 
     function update() {
         if (!displayed) return;
-        console.log('MonkeyConfig: Updating dialog...');
+        log('Updating dialog values');
         for (var paramName in params) {
             var value = values[paramName];
             var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
@@ -205,7 +214,7 @@ function MonkeyConfig(data) {
     }
 
     function saveClick() {
-        console.log('MonkeyConfig: Save clicked');
+        log('Saving configuration');
         for (var paramName in params) {
             var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
             if (!elem) continue;
@@ -258,189 +267,150 @@ function MonkeyConfig(data) {
     }
 
     function cancelClick() { 
-        console.log('MonkeyConfig: Cancel clicked');
+        log('Cancel clicked');
         close(); 
     }
-
-    function forcePositionAndSize() {
-        var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
-        var container = shadowRoot.querySelector('.__MonkeyConfig_container');
-        var viewportHeight = window.innerHeight;
-        var viewportWidth = window.innerWidth;
-        var dialogWidth = parseInt(data.width, 10); // Misalnya 600
-        var dialogHeight = container.getBoundingClientRect().height; // Tinggi aktual container
-        var maxHeight = viewportHeight * 0.8;
-
-        // Paksa lebar dan tinggi container
-        container.style.width = `${dialogWidth}px`;
-        container.style.minWidth = `${dialogWidth}px`;
-        container.style.maxWidth = `${dialogWidth}px`;
-        container.style.height = 'auto';
-        container.style.maxHeight = `${maxHeight}px`;
-        container.style.overflowY = 'auto';
-        // Paksa background dan font-size secara inline
-        container.style.background = 'rgba(255, 255, 255, 0.95)';
-        container.style.fontSize = data.fontSize;
-        container.style.color = data.fontColor;
-
-        // Paksa posisi layer
-        layer.style.position = 'fixed';
-        layer.style.width = `${dialogWidth}px`;
-        layer.style.minWidth = `${dialogWidth}px`;
-        layer.style.maxWidth = `${dialogWidth}px`;
-        layer.style.height = `${dialogHeight}px`;
-        layer.style.maxHeight = `${maxHeight}px`;
-        layer.style.overflowY = 'auto';
-        layer.style.zIndex = '10000';
-
-        // Hitung ulang posisi dengan tinggi aktual
-        dialogHeight = Math.min(dialogHeight, maxHeight);
-        layer.style.top = `${Math.max(0, (viewportHeight - dialogHeight) / 2)}px`;
-        layer.style.left = `${(viewportWidth - dialogWidth) / 2}px`;
-
-        // Log computed style untuk debugging
-        var computedStyle = window.getComputedStyle(container);
-        console.log('MonkeyConfig: Forced position - top:', layer.style.top, 'left:', layer.style.left, 'width:', layer.style.width, 'height:', dialogHeight + 'px', 'max-height:', maxHeight + 'px');
-        console.log('MonkeyConfig: Container effective width:', container.getBoundingClientRect().width);
-        console.log('MonkeyConfig: Container height:', dialogHeight);
-        console.log('MonkeyConfig: Container inline background:', container.style.background);
-        console.log('MonkeyConfig: Container computed background:', computedStyle.background);
-        console.log('MonkeyConfig: Container inline font size:', container.style.fontSize);
-        console.log('MonkeyConfig: Container computed font size:', computedStyle.fontSize);
+    
+    function homepageClick() {
+        log('Homepage clicked');
+        window.open('https://bloggerpemula.pythonanywhere.com/', '_blank');
     }
 
     function open() {
-        console.log('MonkeyConfig: Opening dialog...');
+        log('Opening dialog');
         function openDone() {
             if (window.self !== window.top) {
-                console.log('MonkeyConfig: Not in top window, aborting');
+                log('Running in iframe, aborting');
                 return;
             }
             var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
-            var buttonsContainer = shadowRoot.querySelector('.__MonkeyConfig_buttons_container');
+            var homepageBtn = shadowRoot.querySelector('#__MonkeyConfig_button_homepage');
             if (saveBtn) {
                 saveBtn.addEventListener('click', saveClick, false);
-                console.log('MonkeyConfig: Save button initialized');
-            }
+                log('Save button initialized');
+            } else log('Save button not found');
             if (defaultsBtn) {
                 defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
-                console.log('MonkeyConfig: Defaults button initialized');
-            }
+                log('Defaults button initialized');
+            } else log('Defaults button not found');
             if (cancelBtn) {
                 cancelBtn.addEventListener('click', cancelClick, false);
-                console.log('MonkeyConfig: Cancel button initialized');
-            }
+                log('Cancel button initialized');
+            } else log('Cancel button not found');
+            if (homepageBtn) {
+                homepageBtn.addEventListener('click', homepageClick, false);
+                log('Homepage button initialized');
+            } else log('Homepage button not found');
             displayed = true;
             update();
 
-            var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
-            console.log('MonkeyConfig: Layer element exists:', !!layer);
-            console.log('MonkeyConfig: Overlay element exists:', !!overlay);
-            console.log('MonkeyConfig: Container element exists:', !!container);
-            console.log('MonkeyConfig: Buttons container exists:', !!buttonsContainer);
-            console.log('MonkeyConfig: Viewport size - width:', window.innerWidth, 'height:', window.innerHeight);
-            console.log('MonkeyConfig: Document body size - width:', document.body.scrollWidth, 'height:', document.body.scrollHeight);
-            console.log('MonkeyConfig: Layer position before force:', layer ? layer.getBoundingClientRect() : 'null');
-            console.log('MonkeyConfig: Overlay position before:', overlay ? overlay.getBoundingClientRect() : 'null');
-            console.log('MonkeyConfig: Container position:', container ? container.getBoundingClientRect() : 'null');
+            // Log posisi dan ukuran setelah render
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            log('Overlay properties', {
+                width: overlay.offsetWidth,
+                height: overlay.offsetHeight,
+                top: overlay.style.top,
+                left: overlay.style.left,
+                zIndex: overlay.style.zIndex,
+                background: overlay.style.backgroundColor
+            });
+            log('Container properties', {
+                width: container.offsetWidth,
+                height: container.offsetHeight,
+                top: container.style.top,
+                left: container.style.left,
+                zIndex: container.style.zIndex
+            });
 
-            if (layer && overlay && container) {
-                forcePositionAndSize(); // Paksa posisi dengan tinggi aktual
-                console.log('MonkeyConfig: Layer position after force:', layer.getBoundingClientRect());
-                console.log('MonkeyConfig: Overlay position after:', overlay.getBoundingClientRect());
-                console.log('MonkeyConfig: Buttons container position:', buttonsContainer ? buttonsContainer.getBoundingClientRect() : 'null');
-            } else {
-                console.error('MonkeyConfig: One or more elements are missing');
-            }
+            if (data.adjustOverlaySize) { adjustOverlaySize(); }
         }
 
-        try {
-            var body = document.querySelector('body');
-            if (!body) {
-                console.error('MonkeyConfig: Body not found');
-                return;
-            }
-            // Buat overlay di luar Shadow DOM
-            overlay = document.createElement('div');
-            overlay.className = '__MonkeyConfig_overlay';
-            overlay.style.position = 'fixed';
-            overlay.style.top = '0';
-            overlay.style.left = '0';
-            overlay.style.width = '100vw';
-            overlay.style.height = '100vh';
-            overlay.style.background = 'rgba(0, 0, 0, 0.6)';
-            overlay.style.zIndex = '9999';
-            overlay.style.borderRadius = '0';
-            overlay.style.pointerEvents = 'none';
-            overlay.style.visibility = 'visible';
-            body.appendChild(overlay);
+        function adjustOverlaySize() {
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            var containerRect = container.getBoundingClientRect();
+            var margin = parseInt(data.adjustOverlaySize, 10) || 40;
+            overlay.style.width = (containerRect.width + margin) + 'px';
+            overlay.style.height = (containerRect.height + margin) + 'px';
+            overlay.style.left = '50%';
+            overlay.style.top = '50%';
+            overlay.style.transform = 'translate(-50%, -50%)';
+            log('Overlay size adjusted', { width: overlay.style.width, height: overlay.style.height });
+        }
 
-            openLayer = document.createElement('div');
-            shadowRoot = openLayer.attachShadow({ mode: 'open' });
-            shadowRoot.innerHTML = `
-                <style>
-                    :host {
-                        all: initial;
-                        display: block !important;
-                        font-family: Arial, sans-serif;
-                        position: fixed !important;
-                        top: 0 !important;
-                        left: 0 !important;
-                        width: 100vw !important;
-                        height: 100vh !important;
-                        z-index: 999999 !important;
-                        background: transparent !important;
-                    }
-                    .__MonkeyConfig_layer {
-                        position: fixed !important;
-                        z-index: 10000 !important;
-                        width: ${data.width} !important;
-                        min-width: ${data.width} !important;
-                        max-width: ${data.width} !important;
-                        background: transparent !important;
-                        visibility: visible !important;
-                    }
-                    .__MonkeyConfig_container {
-                        position: relative !important;
-                        z-index: 10000 !important;
-                        background: rgba(255, 255, 255, 0.95) !important;
-                        font-size: 14pt !important;
-                        color: #333333 !important;
-                        width: ${data.width} !important;
-                        min-width: ${data.width} !important;
-                        max-width: ${data.width} !important;
-                        height: auto !important;
-                        min-height: 100px !important;
-                        visibility: visible !important;
-                        border-radius: 0.5em !important;
-                        box-sizing: border-box !important;
-                    }
-                    ${MonkeyConfig.res.stylesheets.main}
-                </style>
-                <div class="__MonkeyConfig_layer">
-                    ${render()}
-                </div>
-            `;
-            container = shadowRoot.querySelector('.__MonkeyConfig_container');
-            body.appendChild(openLayer);
-            console.log('MonkeyConfig: Dialog appended to body');
-            setTimeout(openDone, 200); // Beri waktu untuk rendering
-        } catch (e) {
-            console.error('MonkeyConfig: Error in open function:', e);
+        var body = document.querySelector('body');
+        if (!body) {
+            log('Body element not found');
+            return;
+        }
+        openLayer = document.createElement('div');
+        openLayer.className = '__MonkeyConfig_layer';
+        shadowRoot = openLayer.attachShadow({ mode: 'open' });
+        shadowRoot.innerHTML = `
+            <style>
+                :host {
+                    all: initial;
+                    display: block !important;
+                    font-family: Arial, sans-serif !important;
+                    isolation: isolate;
+                    z-index: 2147483647;
+                }
+                /* Reset spesifik untuk elemen dalam Shadow DOM */
+                h1, h2, h3, h4, h5, h6 {
+                    font-size: inherit !important;
+                    font-weight: normal !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
+                .__MonkeyConfig_overlay {
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    background-color: rgba(0, 0, 0, 0.6) !important;
+                    z-index: 2147483646 !important;
+                }
+                .__MonkeyConfig_container {
+                    position: fixed !important;
+                    top: 50% !important;
+                    left: 50% !important;
+                    transform: translate(-50%, -50%) !important;
+                    z-index: 2147483647 !important;
+                    width: ${data.width} !important;
+                    height: ${data.height} !important;
+                    max-width: 90vw !important;
+                    max-height: 80vh !important;
+                    overflow-y: auto !important;
+                }
+            </style>
+            <div class="__MonkeyConfig_overlay"></div>
+            ${render()}
+        `;
+        container = shadowRoot.querySelector('.__MonkeyConfig_container');
+        if (!container) {
+            log('Container not found in shadow DOM');
+            return;
+        }
+        openLayer.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; z-index: 2147483647 !important;';
+        body.appendChild(openLayer);
+        log('Dialog appended to body');
+        openDone();
+        if (data.adjustOverlaySize) {
+            window.addEventListener('resize', adjustOverlaySize);
+            log('Resize listener added');
         }
     }
 
     function close() {
-        console.log('MonkeyConfig: Closing dialog...');
-        if (openLayer) {
-            openLayer.parentNode.removeChild(openLayer);
-            openLayer = undefined;
-        }
-        if (overlay) {
-            overlay.parentNode.removeChild(overlay);
-            overlay = undefined;
+        log('Closing dialog');
+        if (openLayer) { 
+            openLayer.parentNode.removeChild(openLayer); 
+            openLayer = undefined; 
         }
         shadowRoot = undefined;
         displayed = false;
@@ -519,55 +489,50 @@ MonkeyConfig.formatters = {
 
 MonkeyConfig.res = {
     icons: {
-        'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
+        'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJcouldrIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
         'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
-        'tick': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC'
+        'tick': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC',
+        'home': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIrSURBVDjLpZPrS5NhGIf9W7YvBYOkhlkoqCklWChv2WyKik7o1MWS/Fnris72tyQRQh+SLDTjrpFUQqoYKFYKrdbpLadadzRlJpjhplkgoTj//b+TDV32vPd+5xn3gAzzcFy0B2EYBvx/vz+XF9bS0liQ4o4F8xyr+AwvxVU8OfyxgeRjK8nO3KkceCuG77Dzx48iLPoDWjSknzeK+jyL47tk5JwKIYOtGZmTXDA6ZOKFENYP8Abfi9CbszS6WUKU6I0Kk5N0oJ4UksvWmLoU0+BZ3DOw7ULN41oO0DMLNV0T6Qf0KSCxZ/hNDBe0yVMsLrhTXiC66TlN8zU3bC1wLqsVXIFL7GliO3YHnRKG8VURXg21hvaC3bG5r1a2rDUa7JQXwE4mMlsIKxKCX3KUIeN0oGyiXHVmI0VrsB+CsxBIddZMVaDxOAV3v7M4HOxYbDvbDEvsdAjC3Vwh80GqY4znJUrqHX22J+dWWTk5sJ8yg+njSzDY8y3mKgnmVMzE5J55+1uDwT5vIhSB74bH+1XffzqL/o1nw4x4qDuDzS1GUwE8YNlO/ehmZ6rLzwx9A2f4+mV8+8T6W5zFROg4mm2AVW6M8rK6dvnAjP4ry5IxfA5OAzcHOs9Tii6FOI/nnG8PUNQAv8K2g3T5q3JwdEZdXz4mYkL87mWrwW0A9b8JIZcD7S4N0KQwA+0psnOaG3jtkK9pKBLGusF/C2A8/ADfaLpwjOZrYAAAAASUVORK5CYII='
     },
     stylesheets: {
         main: `
             :host {
                 all: initial;
-                font-family: Arial, sans-serif;
+                font-family: Arial, sans-serif !important;
                 display: block !important;
+                isolation: isolate;
             }
             .__MonkeyConfig_container {
                 display: flex !important;
                 flex-direction: column !important;
-                padding: 0.5em !important;
-                font-size: 14pt !important;
-                color: #333333 !important;
-                background: rgba(255, 255, 255, 0.95) !important;
+                padding: 1em !important;
+                font-size: __FONT_SIZE__ !important;
+                color: __FONT_COLOR__ !important;
+                background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
                 border-radius: 0.5em !important;
                 box-shadow: 2px 2px 16px #000 !important;
-                width: 100% !important;
-                min-width: 100% !important;
-                max-width: 100% !important;
-                height: auto !important;
-                min-height: 100px !important;
-                position: relative !important;
                 box-sizing: border-box !important;
-                visibility: visible !important;
             }
             .__MonkeyConfig_container h1 {
                 border-bottom: solid 1px #999 !important;
                 font-size: 120% !important;
-                margin: 0 0 0.3em 0 !important;
-                padding: 0 0 0.2em 0 !important;
+                font-weight: normal !important;
+                margin: 0 0 0.5em 0 !important;
+                padding: 0 0 0.3em 0 !important;
                 text-align: center !important;
-                font-weight: bold !important;
             }
             .__MonkeyConfig_content {
                 flex: 1 !important;
                 overflow-y: auto !important;
-                max-height: 400px !important;
+                max-height: 60vh !important;
             }
             .__MonkeyConfig_top, .__MonkeyConfig_bottom {
-                margin-bottom: 0.5em !important;
+                margin-bottom: 1em !important;
             }
             .__MonkeyConfig_columns {
                 display: flex !important;
                 justify-content: space-between !important;
-                margin-bottom: 0.5em !important;
+                margin-bottom: 1em !important;
             }
             .__MonkeyConfig_left_column, .__MonkeyConfig_right_column {
                 width: 48% !important;
@@ -580,7 +545,7 @@ MonkeyConfig.res = {
             .__MonkeyConfig_container td {
                 border: none !important;
                 line-height: 100% !important;
-                padding: 0.2em !important;
+                padding: 0.3em !important;
                 text-align: left !important;
                 vertical-align: middle !important;
                 white-space: normal !important;
@@ -594,7 +559,6 @@ MonkeyConfig.res = {
                 margin-right: 0.5em !important;
                 flex-shrink: 0 !important;
                 display: block !important;
-                font-weight: 500 !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] {
                 flex-grow: 0 !important;
@@ -610,18 +574,17 @@ MonkeyConfig.res = {
                 min-width: 50px !important;
             }
             .__MonkeyConfig_buttons_container {
-                margin-top: 0.5em !important;
+                margin-top: 1em !important;
                 border-top: solid 1px #999 !important;
-                padding-top: 0.3em !important;
+                padding-top: 0.6em !important;
                 text-align: center !important;
-                flex-shrink: 0 !important;
             }
             .__MonkeyConfig_buttons_container table {
                 width: auto !important;
                 margin: 0 auto !important;
             }
             .__MonkeyConfig_buttons_container td {
-                padding: 0.2em !important;
+                padding: 0.3em !important;
             }
             .__MonkeyConfig_container button {
                 background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important;
@@ -630,8 +593,6 @@ MonkeyConfig.res = {
                 box-shadow: 0 0 1px #000 !important;
                 padding: 3px 8px 3px 24px !important;
                 white-space: nowrap !important;
-                font-size: 14pt !important;
-                color: #333333 !important;
             }
             .__MonkeyConfig_container button img {
                 vertical-align: middle !important;
@@ -656,22 +617,14 @@ MonkeyConfig.res = {
             .__MonkeyConfig_container button:hover {
                 background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%) !important;
             }
+            @media (max-width: 600px) {
+                .__MonkeyConfig_columns {
+                    flex-direction: column !important;
+                }
+                .__MonkeyConfig_left_column, .__MonkeyConfig_right_column {
+                    width: 100% !important;
+                }
+            }
         `
     }
 };
-
-// Contoh penggunaan untuk debugging
-try {
-    console.log('MonkeyConfig: Creating instance...');
-    var config = new MonkeyConfig({
-        title: "Test Config",
-        width: '600px',
-        parameters: {
-            test: { type: 'text', label: 'Test Input', default: 'Hello' }
-        },
-        menuCommand: true
-    });
-    console.log('MonkeyConfig: Instance created');
-} catch (e) {
-    console.error('MonkeyConfig: Error creating instance:', e);
-}
