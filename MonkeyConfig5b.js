@@ -1,22 +1,20 @@
 // ==UserScript==
 // @name            MonkeyConfig Mod
 // @noframes
-// @version         2.1
+// @version         2.7
 // @namespace       http://odyniec.net/
 // @contributionURL https://saweria.co/Bloggerpemula
-// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, additional input types, and improved isolation
+// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, additional input types, improved isolation, and debug logging
 // ==/UserScript==
 /*
  * MonkeyConfig Modern Reloaded Enhanced
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * v2.1 Updates - March 2025:
- * - Enhanced Shadow DOM isolation with stricter CSS reset
- * - Fixed width/height consistency across sites
- * - Improved overlay background behavior
- * - Added Homepage button linking to https://bloggerpemula.pythonanywhere.com/
- * - Optimized for Android browser compatibility
+ * v2.7 Updates - March 2025:
+ * - Forced iframe usage for better compatibility
+ * - Fixed icon rendering with fallback
+ * - Optimized iframe sizing
  */
 
 function MonkeyConfig(data) {
@@ -26,17 +24,21 @@ function MonkeyConfig(data) {
         storageKey,
         displayed,
         openLayer,
-        shadowRoot,
-        container;
+        overlayLayer,
+        iframeFallback;
+
+    function log(message, data) {
+        console.log(`[MonkeyConfig v2.7] ${message}`, data || '');
+    }
 
     function init() {
+        log('Initializing MonkeyConfig');
         params = data.parameters || data.params;
         data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel', 'homepage'] : data.buttons;
         data.fontSize = data.fontSize || '11pt';
         data.fontColor = data.fontColor || '#000000';
         data.width = data.width || '600px';
         data.height = data.height || 'auto';
-        data.adjustOverlaySize = data.adjustOverlaySize || null;
 
         if (!data.title) {
             data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
@@ -60,6 +62,7 @@ function MonkeyConfig(data) {
 
         if (data.menuCommand) {
             var caption = data.menuCommand !== true ? data.menuCommand : data.title;
+            log('Registering menu command', caption);
             GM_registerMenuCommand(caption, function () { cfg.open(); });
         }
         cfg.open = open;
@@ -81,6 +84,7 @@ function MonkeyConfig(data) {
     }
 
     function render() {
+        log('Rendering dialog');
         var html = '<div class="__MonkeyConfig_container">' +
             '<h1>' + data.title + '</h1>' +
             '<div class="__MonkeyConfig_content">' +
@@ -123,16 +127,16 @@ function MonkeyConfig(data) {
             html += '<td>';
             switch (data.buttons[i]) {
                 case 'cancel':
-                    html += '<button type="button" id="__MonkeyConfig_button_cancel"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.cancel + '" alt="Cancel"/> Cancel</button>';
+                    html += '<button type="button" id="__MonkeyConfig_button_cancel"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.cancel + '" alt="Cancel" onerror="this.style.display=\'none\'"/> Cancel</button>';
                     break;
                 case 'defaults':
-                    html += '<button type="button" id="__MonkeyConfig_button_defaults"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.arrow_undo + '" alt="Defaults"/> Set Defaults</button>';
+                    html += '<button type="button" id="__MonkeyConfig_button_defaults"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.arrow_undo + '" alt="Defaults" onerror="this.style.display=\'none\'"/> Set Defaults</button>';
                     break;
                 case 'save':
-                    html += '<button type="button" id="__MonkeyConfig_button_save"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.tick + '" alt="Save"/> Save</button>';
+                    html += '<button type="button" id="__MonkeyConfig_button_save"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.tick + '" alt="Save" onerror="this.style.display=\'none\'"/> Save</button>';
                     break;
                 case 'homepage':
-                    html += '<button type="button" id="__MonkeyConfig_button_homepage"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.home + '" alt="Homepage"/> Homepage</button>';
+                    html += '<button type="button" id="__MonkeyConfig_button_homepage"><img src="data:image/png;base64,' + MonkeyConfig.res.icons.home + '" alt="Homepage" onerror="this.style.display=\'none\'"/> Homepage</button>';
                     break;
             }
             html += '</td>';
@@ -143,9 +147,12 @@ function MonkeyConfig(data) {
 
     function update() {
         if (!displayed) return;
+        log('Updating dialog values');
+        var root = iframeFallback && iframeFallback.contentDocument;
+        if (!root) return;
         for (var paramName in params) {
             var value = values[paramName];
-            var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
+            var elem = root.querySelector('[name="' + paramName + '"]');
             if (!elem) continue;
             switch (params[paramName].type) {
                 case 'checkbox':
@@ -153,7 +160,7 @@ function MonkeyConfig(data) {
                     break;
                 case 'custom':
                     if (params[paramName].set) {
-                        params[paramName].set(value, shadowRoot.querySelector('#__MonkeyConfig_parent_' + paramName));
+                        params[paramName].set(value, root.querySelector('#__MonkeyConfig_parent_' + paramName));
                     }
                     break;
                 case 'number':
@@ -164,7 +171,7 @@ function MonkeyConfig(data) {
                     elem.value = value;
                     break;
                 case 'radio':
-                    var radio = shadowRoot.querySelector('[name="' + paramName + '"][value="' + value + '"]');
+                    var radio = root.querySelector('[name="' + paramName + '"][value="' + value + '"]');
                     if (radio) radio.checked = true;
                     break;
                 case 'file':
@@ -172,12 +179,12 @@ function MonkeyConfig(data) {
                     break;
                 case 'select':
                     if (elem.tagName.toLowerCase() === 'input' && elem.type === 'checkbox') {
-                        var checkboxes = shadowRoot.querySelectorAll('input[name="' + paramName + '"]');
+                        var checkboxes = root.querySelectorAll('input[name="' + paramName + '"]');
                         for (var i = 0; i < checkboxes.length; i++) {
                             checkboxes[i].checked = value.indexOf(checkboxes[i].value) > -1;
                         }
                     } else if (elem.multiple) {
-                        var options = shadowRoot.querySelectorAll('select[name="' + paramName + '"] option');
+                        var options = root.querySelectorAll('select[name="' + paramName + '"] option');
                         for (var i = 0; i < options.length; i++) {
                             options[i].selected = value.indexOf(options[i].value) > -1;
                         }
@@ -188,7 +195,7 @@ function MonkeyConfig(data) {
             }
             elem.style.fontSize = params[paramName].fontSize || data.fontSize;
             elem.style.color = params[paramName].fontColor || data.fontColor;
-            var label = shadowRoot.querySelector('label[for="__MonkeyConfig_field_' + paramName + '"]');
+            var label = root.querySelector('label[for="__MonkeyConfig_field_' + paramName + '"]');
             if (label) {
                 label.style.fontSize = params[paramName].fontSize || data.fontSize;
                 label.style.color = params[paramName].fontColor || data.fontColor;
@@ -206,8 +213,10 @@ function MonkeyConfig(data) {
     }
 
     function saveClick() {
+        log('Saving configuration');
+        var root = iframeFallback.contentDocument;
         for (var paramName in params) {
-            var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
+            var elem = root.querySelector('[name="' + paramName + '"]');
             if (!elem) continue;
             switch (params[paramName].type) {
                 case 'checkbox':
@@ -215,7 +224,7 @@ function MonkeyConfig(data) {
                     break;
                 case 'custom':
                     if (params[paramName].get) {
-                        values[paramName] = params[paramName].get(shadowRoot.querySelector('#__MonkeyConfig_parent_' + paramName));
+                        values[paramName] = params[paramName].get(root.querySelector('#__MonkeyConfig_parent_' + paramName));
                     }
                     break;
                 case 'number':
@@ -226,7 +235,7 @@ function MonkeyConfig(data) {
                     values[paramName] = elem.value;
                     break;
                 case 'radio':
-                    var checkedRadio = shadowRoot.querySelector('[name="' + paramName + '"]:checked');
+                    var checkedRadio = root.querySelector('[name="' + paramName + '"]:checked');
                     values[paramName] = checkedRadio ? checkedRadio.value : '';
                     break;
                 case 'file':
@@ -235,13 +244,13 @@ function MonkeyConfig(data) {
                 case 'select':
                     if (elem.tagName.toLowerCase() === 'input' && elem.type === 'checkbox') {
                         values[paramName] = [];
-                        var inputs = shadowRoot.querySelectorAll('input[name="' + paramName + '"]');
+                        var inputs = root.querySelectorAll('input[name="' + paramName + '"]');
                         for (var i = 0; i < inputs.length; i++) {
                             if (inputs[i].checked) values[paramName].push(inputs[i].value);
                         }
                     } else if (elem.multiple) {
                         values[paramName] = [];
-                        var options = shadowRoot.querySelectorAll('select[name="' + paramName + '"] option');
+                        var options = root.querySelectorAll('select[name="' + paramName + '"] option');
                         for (var i = 0; i < options.length; i++) {
                             if (options[i].selected) values[paramName].push(options[i].value);
                         }
@@ -257,93 +266,143 @@ function MonkeyConfig(data) {
         location.reload();
     }
 
-    function cancelClick() { close(); }
+    function cancelClick() { 
+        log('Cancel clicked');
+        close(); 
+    }
     
     function homepageClick() {
+        log('Homepage clicked');
         window.open('https://bloggerpemula.pythonanywhere.com/', '_blank');
     }
 
     function open() {
-        function openDone() {
-            if (window.self !== window.top) return;
-            var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
-            var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
-            var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
-            var homepageBtn = shadowRoot.querySelector('#__MonkeyConfig_button_homepage');
-            if (saveBtn) saveBtn.addEventListener('click', saveClick, false);
-            if (defaultsBtn) defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
-            if (cancelBtn) cancelBtn.addEventListener('click', cancelClick, false);
-            if (homepageBtn) homepageBtn.addEventListener('click', homepageClick, false);
+        log('Opening dialog');
+        function openDone(root) {
+            if (window.self !== window.top) {
+                log('Running in iframe, aborting');
+                return;
+            }
+            var saveBtn = root.querySelector('#__MonkeyConfig_button_save');
+            var defaultsBtn = root.querySelector('#__MonkeyConfig_button_defaults');
+            var cancelBtn = root.querySelector('#__MonkeyConfig_button_cancel');
+            var homepageBtn = root.querySelector('#__MonkeyConfig_button_homepage');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveClick, false);
+                log('Save button initialized');
+            } else log('Save button not found');
+            if (defaultsBtn) {
+                defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
+                log('Defaults button initialized');
+            } else log('Defaults button not found');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', cancelClick, false);
+                log('Cancel button initialized');
+            } else log('Cancel button not found');
+            if (homepageBtn) {
+                homepageBtn.addEventListener('click', homepageClick, false);
+                log('Homepage button initialized');
+            } else log('Homepage button not found');
             displayed = true;
             update();
-            if (data.adjustOverlaySize) { adjustOverlaySize(); }
+
+            var container = root.querySelector('.__MonkeyConfig_container');
+            log('Container properties after render', {
+                width: container.offsetWidth,
+                height: container.offsetHeight,
+                top: iframeFallback.style.top,
+                left: iframeFallback.style.left,
+                zIndex: iframeFallback.style.zIndex
+            });
+            adjustIframeSize(container);
         }
 
-        function adjustOverlaySize() {
-            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
-            var containerRect = container.getBoundingClientRect();
-            var margin = parseInt(data.adjustOverlaySize, 10) || 40;
-            overlay.style.width = (containerRect.width + margin) + 'px';
-            overlay.style.height = (containerRect.height + margin) + 'px';
-            overlay.style.left = '50%';
-            overlay.style.top = '50%';
-            overlay.style.transform = 'translate(-50%, -50%)';
+        function adjustIframeSize(container) {
+            var rect = container.getBoundingClientRect();
+            iframeFallback.style.width = Math.max(parseInt(data.width), rect.width + 20) + 'px';
+            iframeFallback.style.height = Math.max(300, rect.height + 20) + 'px';
+            log('Iframe size adjusted', { width: iframeFallback.style.width, height: iframeFallback.style.height });
         }
 
-        var body = document.querySelector('body');
-        openLayer = document.createElement('div');
-        openLayer.className = '__MonkeyConfig_layer';
-        shadowRoot = openLayer.attachShadow({ mode: 'open' });
-        shadowRoot.innerHTML = `
-            <style>
-                :host {
-                    all: initial !important;
-                    display: block !important;
-                    font-family: Arial, sans-serif !important;
-                    contain: strict !important; /* Membatasi pengaruh CSS eksternal */
-                }
-                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
-                .__MonkeyConfig_overlay {
-                    position: fixed !important;
-                    background-color: rgba(0, 0, 0, 0.6) !important;
-                    z-index: 1 !important;
-                    border-radius: 0.5em !important;
-                    width: 100% !important;
-                    height: 100% !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    transform: none !important;
-                }
-                .__MonkeyConfig_container {
-                    position: fixed !important;
-                    z-index: 2 !important;
-                    top: 50% !important;
-                    left: 50% !important;
-                    transform: translate(-50%, -50%) !important;
-                    width: ${data.width} !important;
-                    height: ${data.height} !important;
-                    max-width: 90vw !important;
-                    max-height: 80vh !important;
-                    overflow-y: auto !important;
-                }
-            </style>
-            <div class="__MonkeyConfig_overlay"></div>
-            ${render()}
-        `;
-        container = shadowRoot.querySelector('.__MonkeyConfig_container');
-        openLayer.style.cssText = 'position: fixed !important; z-index: 10000 !important; width: 0 !important; height: 0 !important;';
-        body.appendChild(openLayer);
-        openDone();
-
-        if (data.adjustOverlaySize) {
-            window.addEventListener('resize', adjustOverlaySize);
+        var body = document.querySelector('body') || document.documentElement;
+        if (!body) {
+            log('No suitable parent element found');
+            return;
         }
+
+        // Overlay di DOM utama
+        overlayLayer = document.createElement('div');
+        overlayLayer.className = '__MonkeyConfig_overlay';
+        overlayLayer.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.6) !important; z-index: 2147483646 !important;';
+        body.appendChild(overlayLayer);
+        log('Overlay appended to body');
+
+        // Paksa iframe
+        iframeFallback = document.createElement('iframe');
+        iframeFallback.style.cssText = 'position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ' + data.width + ' !important; height: 300px !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;';
+        body.appendChild(iframeFallback);
+        var iframeDoc = iframeFallback.contentDocument;
+        iframeDoc.open();
+        iframeDoc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {
+                        margin: 0 !important;
+                        padding: 10px !important;
+                        background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
+                        font-family: Arial, sans-serif !important;
+                        font-size: ${data.fontSize} !important;
+                        color: ${data.fontColor} !important;
+                    }
+                    h1 {
+                        font-size: 120% !important;
+                        font-weight: normal !important;
+                        margin: 0 0 0.5em 0 !important;
+                        padding: 0 0 0.3em 0 !important;
+                        border-bottom: solid 1px #999 !important;
+                        text-align: center !important;
+                    }
+                    ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
+                    .__MonkeyConfig_container {
+                        position: relative !important;
+                        width: ${data.width} !important;
+                        max-width: 100% !important;
+                        overflow-y: auto !important;
+                    }
+                </style>
+            </head>
+            <body>
+                ${render()}
+            </body>
+            </html>
+        `);
+        iframeDoc.close();
+        openLayer = iframeFallback;
+        openDone(iframeDoc);
+
+        log('Overlay properties after render', {
+            width: overlayLayer.offsetWidth,
+            height: overlayLayer.offsetHeight,
+            top: overlayLayer.style.top,
+            left: overlayLayer.style.left,
+            zIndex: overlayLayer.style.zIndex,
+            background: overlayLayer.style.backgroundColor
+        });
     }
 
     function close() {
-        if (openLayer) { openLayer.parentNode.removeChild(openLayer); openLayer = undefined; }
-        shadowRoot = undefined;
+        log('Closing dialog');
+        if (openLayer) { 
+            openLayer.parentNode.removeChild(openLayer); 
+            openLayer = undefined; 
+        }
+        if (overlayLayer) {
+            overlayLayer.parentNode.removeChild(overlayLayer);
+            overlayLayer = undefined;
+        }
+        iframeFallback = undefined;
         displayed = false;
     }
 
@@ -420,18 +479,18 @@ MonkeyConfig.formatters = {
 
 MonkeyConfig.res = {
     icons: {
-        'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
-        'cancel': 'iVBORwElmF7nqM7uXAAAAAElFTkSuQmCC',
+        'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJcouldrIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
+        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
         'tick': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC',
         'home': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIrSURBVDjLpZPrS5NhGIf9W7YvBYOkhlkoqCklWChv2WyKik7o1MWS/Fnris72tyQRQh+SLDTjrpFUQqoYKFYKrdbpLadadzRlJpjhplkgoTj//b+TDV32vPd+5xn3gAzzcFy0B2EYBvx/vz+XF9bS0liQ4o4F8xyr+AwvxVU8OfyxgeRjK8nO3KkceCuG77Dzx48iLPoDWjSknzeK+jyL47tk5JwKIYOtGZmTXDA6ZOKFENYP8Abfi9CbszS6WUKU6I0Kk5N0oJ4UksvWmLoU0+BZ3DOw7ULN41oO0DMLNV0T6Qf0KSCxZ/hNDBe0yVMsLrhTXiC66TlN8zU3bC1wLqsVXIFL7GliO3YHnRKG8VURXg21hvaC3bG5r1a2rDUa7JQXwE4mMlsIKxKCX3KUIeN0oGyiXHVmI0VrsB+CsxBIddZMVaDxOAV3v7M4HOxYbDvbDEvsdAjC3Vwh80GqY4znJUrqHX22J+dWWTk5sJ8yg+njSzDY8y3mKgnmVMzE5J55+1uDwT5vIhSB74bH+1XffzqL/o1nw4x4qDuDzS1GUwE8YNlO/ehmZ6rLzwx9A2f4+mV8+8T6W5zFROg4mm2AVW6M8rK6dvnAjP4ry5IxfA5OAzcHOs9Tii6FOI/nnG8PUNQAv8K2g3T5q3JwdEZdXz4mYkL87mWrwW0A9b8JIZcD7S4N0KQwA+0psnOaG3jtkK9pKBLGusF/C2A8/ADfaLpwjOZrYAAAAASUVORK5CYII='
     },
     stylesheets: {
         main: `
-            :host {
-                all: initial !important;
+            body {
+                all: initial;
                 font-family: Arial, sans-serif !important;
                 display: block !important;
-                contain: strict !important;
+                isolation: isolate;
             }
             .__MonkeyConfig_container {
                 display: flex !important;
@@ -447,6 +506,7 @@ MonkeyConfig.res = {
             .__MonkeyConfig_container h1 {
                 border-bottom: solid 1px #999 !important;
                 font-size: 120% !important;
+                font-weight: normal !important;
                 margin: 0 0 0.5em 0 !important;
                 padding: 0 0 0.3em 0 !important;
                 text-align: center !important;
@@ -526,6 +586,8 @@ MonkeyConfig.res = {
             }
             .__MonkeyConfig_container button img {
                 vertical-align: middle !important;
+                width: 16px !important;
+                height: 16px !important;
             }
             .__MonkeyConfig_container label {
                 line-height: 120% !important;
