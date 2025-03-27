@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            MonkeyConfig Mod
 // @noframes
-// @version         2.1
+// @version         2.7
 // @namespace       http://odyniec.net/
 // @contributionURL https://saweria.co/Bloggerpemula
 // @description     Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
@@ -11,17 +11,8 @@
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
- * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
- * Modified: Added text-align option for labels, reduced width of number and text fields - March 2025
- * Modified: Added per-parameter font-size and font-color customization - March 2025
- * Fixed: Ensured per-parameter font-size and font-color apply correctly - March 2025
- * Fixed: Improved Shadow DOM isolation for consistent styling across sites - March 2025
- * Fixed: Overlay z-index to ensure dialog is clickable - March 2025
- * Fixed: Adjusted overlay size to fit dialog content - March 2025
- * Added: Optional adjustOverlaySize parameter for custom overlay margin - March 2025
- * Fixed: Enhanced Shadow DOM isolation to prevent host page CSS interference - March 2025
- * Fixed: Moved all styling into Shadow DOM to fully isolate __MonkeyConfig_layer - March 2025
+ * Fixed: Forced positioning and sizing with JS to ensure visibility - March 2025
+ * Fixed: Added max-width to prevent width override - March 2025
  */
 function MonkeyConfig(data) {
     var cfg = this,
@@ -34,13 +25,14 @@ function MonkeyConfig(data) {
         container;
 
     function init() {
+        console.log('MonkeyConfig: Initializing...');
         params = data.parameters || data.params;
         data.buttons = data.buttons === undefined ? ['save', 'defaults', 'cancel'] : data.buttons;
         data.fontSize = data.fontSize || '11pt';
         data.fontColor = data.fontColor || '#000000';
-        data.width = data.width || '600px';  // Default width
-        data.height = data.height || 'auto'; // Default height
-        data.adjustOverlaySize = data.adjustOverlaySize || null; // Parameter baru, null jika tidak ditentukan
+        data.width = data.width || '600px';
+        data.height = data.height || 'auto';
+        data.adjustOverlaySize = data.adjustOverlaySize || null;
         if (!data.title) {
             data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
         }
@@ -61,12 +53,21 @@ function MonkeyConfig(data) {
         }
         if (data.menuCommand) {
             var caption = data.menuCommand !== true ? data.menuCommand : data.title;
-            GM_registerMenuCommand(caption, function () { cfg.open(); });
+            if (typeof GM_registerMenuCommand === 'function') {
+                console.log('MonkeyConfig: Registering menu command:', caption);
+                GM_registerMenuCommand(caption, function () {
+                    console.log('MonkeyConfig: Menu command clicked, calling open...');
+                    cfg.open();
+                });
+            } else {
+                console.error('MonkeyConfig: GM_registerMenuCommand is not available');
+            }
         }
         cfg.open = open;
         cfg.close = close;
         cfg.get = get;
         cfg.set = function (name, value) { set(name, value); update(); };
+        console.log('MonkeyConfig: Initialization complete');
     }
 
     function get(name) { return values[name]; }
@@ -140,6 +141,7 @@ function MonkeyConfig(data) {
 
     function update() {
         if (!displayed) return;
+        console.log('MonkeyConfig: Updating dialog...');
         for (var paramName in params) {
             var value = values[paramName];
             var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
@@ -203,6 +205,7 @@ function MonkeyConfig(data) {
     }
 
     function saveClick() {
+        console.log('MonkeyConfig: Save clicked');
         for (var paramName in params) {
             var elem = shadowRoot.querySelector('[name="' + paramName + '"]');
             if (!elem) continue;
@@ -254,89 +257,187 @@ function MonkeyConfig(data) {
         location.reload();
     }
 
-    function cancelClick() { close(); }
+    function cancelClick() { 
+        console.log('MonkeyConfig: Cancel clicked');
+        close(); 
+    }
+
+    function adjustOverlaySize() {
+        var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+        var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+        var containerRect = container.getBoundingClientRect();
+        var margin = parseInt(data.adjustOverlaySize, 10) || 40;
+        overlay.style.width = (containerRect.width + margin) + 'px';
+        overlay.style.height = (containerRect.height + margin) + 'px';
+        overlay.style.left = '50%';
+        overlay.style.top = '50%';
+        overlay.style.transform = 'translate(-50%, -50%)';
+        console.log('MonkeyConfig: Overlay size adjusted - width:', overlay.style.width, 'height:', overlay.style.height);
+    }
+
+    function defaultOverlaySize() {
+        var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+        var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+        var containerRect = container.getBoundingClientRect();
+        overlay.style.width = containerRect.width + 'px';
+        overlay.style.height = containerRect.height + 'px';
+        overlay.style.left = '50%';
+        overlay.style.top = '50%';
+        overlay.style.transform = 'translate(-50%, -50%)';
+        console.log('MonkeyConfig: Overlay size set - width:', overlay.style.width, 'height:', overlay.style.height);
+    }
+
+    function forcePositionAndSize() {
+        var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
+        var viewportHeight = window.innerHeight;
+        var viewportWidth = window.innerWidth;
+        var dialogWidth = parseInt(data.width, 10); // Misalnya 600
+        var dialogHeight = layer.getBoundingClientRect().height;
+
+        // Paksa posisi di tengah viewport
+        layer.style.position = 'fixed';
+        layer.style.top = `${(viewportHeight - dialogHeight) / 2}px`;
+        layer.style.left = `${(viewportWidth - dialogWidth) / 2}px`;
+        layer.style.transform = 'none'; // Hapus transform untuk debugging
+        layer.style.width = data.width;
+        layer.style.maxWidth = data.width;
+        layer.style.height = 'auto';
+
+        console.log('MonkeyConfig: Forced position - top:', layer.style.top, 'left:', layer.style.left, 'width:', layer.style.width);
+    }
 
     function open() {
+        console.log('MonkeyConfig: Opening dialog...');
         function openDone() {
-            if (window.self !== window.top) return;
+            if (window.self !== window.top) {
+                console.log('MonkeyConfig: Not in top window, aborting');
+                return;
+            }
             var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
-            if (saveBtn) saveBtn.addEventListener('click', saveClick, false);
-            if (defaultsBtn) defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
-            if (cancelBtn) cancelBtn.addEventListener('click', cancelClick, false);
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveClick, false);
+                console.log('MonkeyConfig: Save button initialized');
+            }
+            if (defaultsBtn) {
+                defaultsBtn.addEventListener('click', function () { setDefaults(); }, false);
+                console.log('MonkeyConfig: Defaults button initialized');
+            }
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', cancelClick, false);
+                console.log('MonkeyConfig: Cancel button initialized');
+            }
             displayed = true;
             update();
-            if (data.adjustOverlaySize) { adjustOverlaySize(); }
-        }
 
-        function adjustOverlaySize() {
             var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
             var container = shadowRoot.querySelector('.__MonkeyConfig_container');
-            var containerRect = container.getBoundingClientRect();
-            var margin = parseInt(data.adjustOverlaySize, 10) || 40; // Gunakan nilai dari parameter atau default 40px
-            overlay.style.width = (containerRect.width + margin) + 'px';
-            overlay.style.height = (containerRect.height + margin) + 'px';
-            overlay.style.left = '50%';
-            overlay.style.top = '50%';
-            overlay.style.transform = 'translate(-50%, -50%)';
+            var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
+            console.log('MonkeyConfig: Layer element:', layer);
+            console.log('MonkeyConfig: Overlay element:', overlay);
+            console.log('MonkeyConfig: Container element:', container);
+            console.log('MonkeyConfig: Viewport size - width:', window.innerWidth, 'height:', window.innerHeight);
+            console.log('MonkeyConfig: Document body size - width:', document.body.scrollWidth, 'height:', document.body.scrollHeight);
+            console.log('MonkeyConfig: Layer position before force:', layer.getBoundingClientRect());
+            console.log('MonkeyConfig: Overlay position:', overlay.getBoundingClientRect());
+            console.log('MonkeyConfig: Container position:', container.getBoundingClientRect());
+
+            forcePositionAndSize(); // Paksa posisi dan ukuran
+
+            if (data.adjustOverlaySize) { 
+                adjustOverlaySize(); 
+                console.log('MonkeyConfig: Adjusted overlay size');
+            } else { 
+                defaultOverlaySize(); 
+                console.log('MonkeyConfig: Set default overlay size');
+            }
+
+            console.log('MonkeyConfig: Layer position after force:', layer.getBoundingClientRect());
         }
 
-        var body = document.querySelector('body');
-        openLayer = document.createElement('div');
-        shadowRoot = openLayer.attachShadow({ mode: 'open' });
-        shadowRoot.innerHTML = `
-            <style>
-                :host {
-                    all: initial; /* Reset semua properti CSS */
-                    display: block;
-                    font-family: Arial, sans-serif; /* Tentukan font default */
-                }
-                .__MonkeyConfig_layer {
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    max-height: 80vh;
-                    overflow-y: auto;
-                    z-index: 10000;
-                    width: ${data.width};
-                    height: ${data.height};
-                    contain: strict; /* Isolasi layout, paint, dan style */
-                }
-                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
-                .__MonkeyConfig_overlay {
-                    position: absolute;
-                    background: rgba(0, 0, 0, 0.6); /* Background eksplisit */
-                    width: 100%; /* Default penuh, akan disesuaikan jika adjustOverlaySize ada */
-                    height: 100%; /* Default penuh */
-                    z-index: 1; /* Overlay di belakang container */
-                    border-radius: 0.5em; /* Sesuaikan dengan container */
-                    pointer-events: none; /* Tidak mengganggu interaksi */
-                }
-                .__MonkeyConfig_container {
-                    position: relative; /* Pastikan container di atas overlay */
-                    z-index: 2; /* Container di depan overlay */
-                    background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; /* Paksa background */
-                }
-            </style>
-            <div class="__MonkeyConfig_layer">
-                <div class="__MonkeyConfig_overlay"></div>
-                ${render()}
-            </div>
-        `;
-        container = shadowRoot.querySelector('.__MonkeyConfig_container');
-        body.appendChild(openLayer);
-        openDone();
-
-        // Tambahkan event listener resize hanya jika adjustOverlaySize ada
-        if (data.adjustOverlaySize) {
-            window.addEventListener('resize', adjustOverlaySize);
+        try {
+            var body = document.querySelector('body');
+            if (!body) {
+                console.error('MonkeyConfig: Body not found');
+                return;
+            }
+            openLayer = document.createElement('div');
+            shadowRoot = openLayer.attachShadow({ mode: 'open' });
+            shadowRoot.innerHTML = `
+                <style>
+                    :host {
+                        all: initial;
+                        display: block !important;
+                        font-family: Arial, sans-serif;
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        z-index: 999999 !important;
+                        background: transparent !important;
+                    }
+                    .__MonkeyConfig_layer {
+                        position: fixed !important;
+                        max-height: 80vh !important;
+                        overflow-y: auto !important;
+                        z-index: 10000 !important;
+                        width: ${data.width} !important;
+                        max-width: ${data.width} !important;
+                        height: ${data.height} !important;
+                        background: transparent !important;
+                        visibility: visible !important;
+                    }
+                    ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
+                    .__MonkeyConfig_overlay {
+                        position: absolute !important;
+                        background: rgba(0, 0, 0, 0.6) !important;
+                        z-index: 1 !important;
+                        border-radius: 0.5em !important;
+                        pointer-events: none !important;
+                        visibility: visible !important;
+                    }
+                    .__MonkeyConfig_container {
+                        position: relative !important;
+                        z-index: 2 !important;
+                        background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: 100px !important;
+                        visibility: visible !important;
+                    }
+                </style>
+                <div class="__MonkeyConfig_layer">
+                    <div class="__MonkeyConfig_overlay"></div>
+                    ${render()}
+                </div>
+            `;
+            container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            body.appendChild(openLayer);
+            console.log('MonkeyConfig: Dialog appended to body');
+            openDone();
+            if (data.adjustOverlaySize) {
+                window.addEventListener('resize', adjustOverlaySize);
+            } else {
+                window.addEventListener('resize', defaultOverlaySize);
+            }
+        } catch (e) {
+            console.error('MonkeyConfig: Error in open function:', e);
         }
     }
 
     function close() {
-        if (openLayer) { openLayer.parentNode.removeChild(openLayer); openLayer = undefined; }
+        console.log('MonkeyConfig: Closing dialog...');
+        if (openLayer) {
+            if (data.adjustOverlaySize) {
+                window.removeEventListener('resize', adjustOverlaySize);
+            } else {
+                window.removeEventListener('resize', defaultOverlaySize);
+            }
+            openLayer.parentNode.removeChild(openLayer);
+            openLayer = undefined;
+        }
         shadowRoot = undefined;
         displayed = false;
     }
@@ -421,128 +522,146 @@ MonkeyConfig.res = {
     stylesheets: {
         main: `
             :host {
-                all: initial; /* Reset semua properti CSS */
-                font-family: Arial, sans-serif; /* Font default */
-                display: block;
+                all: initial;
+                font-family: Arial, sans-serif;
+                display: block !important;
             }
             .__MonkeyConfig_container {
-                display: flex;
-                flex-direction: column;
-                padding: 1em;
-                font-size: __FONT_SIZE__;
-                color: __FONT_COLOR__;
-                background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%);
-                border-radius: 0.5em;
-                box-shadow: 2px 2px 16px #000;
-                max-width: 90vw;
-                width: 100%;
-                height: 100%;
-                position: relative; /* Pastikan posisi relatif untuk z-index */
-                box-sizing: border-box;
+                display: flex !important;
+                flex-direction: column !important;
+                padding: 1em !important;
+                font-size: __FONT_SIZE__ !important;
+                color: __FONT_COLOR__ !important;
+                background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
+                border-radius: 0.5em !important;
+                box-shadow: 2px 2px 16px #000 !important;
+                max-width: 90vw !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: 100px !important;
+                position: relative !important;
+                box-sizing: border-box !important;
+                visibility: visible !important;
             }
             .__MonkeyConfig_container h1 {
-                border-bottom: solid 1px #999;
-                font-size: 120%;
-                margin: 0 0 0.5em 0;
-                padding: 0 0 0.3em 0;
-                text-align: center;
+                border-bottom: solid 1px #999 !important;
+                font-size: 120% !important;
+                margin: 0 0 0.5em 0 !important;
+                padding: 0 0 0.3em 0 !important;
+                text-align: center !important;
             }
             .__MonkeyConfig_content {
-                flex: 1;
-                overflow-y: auto;
-                max-height: 60vh;
+                flex: 1 !important;
+                overflow-y: auto !important;
+                max-height: 60vh !important;
             }
             .__MonkeyConfig_top, .__MonkeyConfig_bottom {
-                margin-bottom: 1em;
+                margin-bottom: 1em !important;
             }
             .__MonkeyConfig_columns {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 1em;
+                display: flex !important;
+                justify-content: space-between !important;
+                margin-bottom: 1em !important;
             }
             .__MonkeyConfig_left_column, .__MonkeyConfig_right_column {
-                width: 48%;
+                width: 48% !important;
             }
             .__MonkeyConfig_container table {
-                border-spacing: 0;
-                margin: 0;
-                width: 100%;
+                border-spacing: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
             }
             .__MonkeyConfig_container td {
-                border: none;
-                line-height: 100%;
-                padding: 0.3em;
-                text-align: left;
-                vertical-align: middle;
-                white-space: normal;
+                border: none !important;
+                line-height: 100% !important;
+                padding: 0.3em !important;
+                text-align: left !important;
+                vertical-align: middle !important;
+                white-space: normal !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline {
-                display: flex;
-                align-items: center;
-                white-space: nowrap;
+                display: flex !important;
+                align-items: center !important;
+                white-space: nowrap !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline label {
-                margin-right: 0.5em;
-                flex-shrink: 0;
-                display: block;
+                margin-right: 0.5em !important;
+                flex-shrink: 0 !important;
+                display: block !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] {
-                flex-grow: 0;
-                margin: 0 0.3em 0 0;
-                display: inline-block;
-                width: 16px;
-                height: 16px;
+                flex-grow: 0 !important;
+                margin: 0 0.3em 0 0 !important;
+                display: inline-block !important;
+                width: 16px !important;
+                height: 16px !important;
             }
             .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"],
             .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] {
-                flex-grow: 0;
-                width: 100px;
-                min-width: 50px;
+                flex-grow: 0 !important;
+                width: 100px !important;
+                min-width: 50px !important;
             }
             .__MonkeyConfig_buttons_container {
-                margin-top: 1em;
-                border-top: solid 1px #999;
-                padding-top: 0.6em;
-                text-align: center;
+                margin-top: 1em !important;
+                border-top: solid 1px #999 !important;
+                padding-top: 0.6em !important;
+                text-align: center !important;
             }
             .__MonkeyConfig_buttons_container table {
-                width: auto;
-                margin: 0 auto;
+                width: auto !important;
+                margin: 0 auto !important;
             }
             .__MonkeyConfig_buttons_container td {
-                padding: 0.3em;
+                padding: 0.3em !important;
             }
             .__MonkeyConfig_container button {
-                background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%);
-                border: solid 1px;
-                border-radius: 0.5em;
-                box-shadow: 0 0 1px #000;
-                padding: 3px 8px 3px 24px;
-                white-space: nowrap;
+                background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important;
+                border: solid 1px !important;
+                border-radius: 0.5em !important;
+                box-shadow: 0 0 1px #000 !important;
+                padding: 3px 8px 3px 24px !important;
+                white-space: nowrap !important;
             }
             .__MonkeyConfig_container button img {
-                vertical-align: middle;
+                vertical-align: middle !important;
             }
             .__MonkeyConfig_container label {
-                line-height: 120%;
-                vertical-align: middle;
-                display: inline-block;
+                line-height: 120% !important;
+                vertical-align: middle !important;
+                display: inline-block !important;
             }
             .__MonkeyConfig_container textarea {
-                vertical-align: text-top;
-                width: 100%;
-                white-space: pre-wrap;
-                resize: vertical;
-                text-align: left;
+                vertical-align: text-top !important;
+                width: 100% !important;
+                white-space: pre-wrap !important;
+                resize: vertical !important;
+                text-align: left !important;
             }
             .__MonkeyConfig_container input[type="text"],
             .__MonkeyConfig_container input[type="number"],
             .__MonkeyConfig_container input[type="color"] {
-                background: #fff;
+                background: #fff !important;
             }
             .__MonkeyConfig_container button:hover {
-                background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%);
+                background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%) !important;
             }
         `
     }
 };
+
+// Contoh penggunaan untuk debugging
+try {
+    console.log('MonkeyConfig: Creating instance...');
+    var config = new MonkeyConfig({
+        title: "Test Config",
+        width: '600px',
+        parameters: {
+            test: { type: 'text', label: 'Test Input', default: 'Hello' }
+        },
+        menuCommand: true
+    });
+    console.log('MonkeyConfig: Instance created');
+} catch (e) {
+    console.error('MonkeyConfig: Error creating instance:', e);
+}
