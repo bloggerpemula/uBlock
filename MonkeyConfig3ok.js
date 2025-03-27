@@ -19,10 +19,12 @@ function MonkeyConfig(data) {
 
     function init() {
         data.buttons = data.buttons || ['save', 'defaults', 'cancel', 'homepage'];
-        data.fontSize = data.fontSize || '11pt';
+        data.fontSize = data.fontSize || '11pt'; // Ukuran font default
         data.fontColor = data.fontColor || '#000000';
-        data.width = data.width || '600px';
-        data.height = data.height || 'auto';
+        data.shadowWidth = data.shadowWidth || '600px'; // Lebar default untuk Shadow DOM
+        data.shadowHeight = data.shadowHeight || 'auto'; // Tinggi default untuk Shadow DOM
+        data.iframeWidth = data.iframeWidth || '600px'; // Lebar default untuk iframe
+        data.iframeHeight = data.iframeHeight || '300px'; // Tinggi default untuk iframe
         data.title = data.title || (typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration');
         
         storageKey = '_MonkeyConfig_' + data.title.replace(/[^a-zA-Z0-9]/g, '_') + '_cfg';
@@ -110,7 +112,7 @@ function MonkeyConfig(data) {
             if (!elem) continue;
             if (param.type === 'checkbox') values[key] = elem.checked;
             else if (param.type === 'custom' && param.get) values[key] = param.get(root.querySelector(`#__MonkeyConfig_parent_${key}`));
-            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) values[key] = elem.value;
+            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) elem.value = values[key];
             else if (param.type === 'radio') values[key] = root.querySelector(`[name="${key}"]:checked`)?.value || '';
             else if (param.type === 'file') values[key] = elem.dataset.value || values[key];
             else if (param.type === 'select') {
@@ -152,7 +154,7 @@ function MonkeyConfig(data) {
                 h1 { font-size: inherit !important; font-weight: normal !important; margin: 0 !important; padding: 0 !important; }
                 ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
                 .__MonkeyConfig_overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.6) !important; z-index: 2147483646 !important; }
-                .__MonkeyConfig_container { position: fixed !important; top: For50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; z-index: 2147483647 !important; width: ${data.width} !important; height: ${data.height} !important; max-width: 90vw !important; max-height: 80vh !important; overflow-y: auto !important; }
+                .__MonkeyConfig_container { position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; z-index: 2147483647 !important; width: ${data.shadowWidth} !important; height: ${data.shadowHeight} !important; max-width: 90vw !important; max-height: 80vh !important; overflow-y: auto !important; }
             </style>
             <div class="__MonkeyConfig_overlay"></div>
             ${render()}
@@ -167,7 +169,7 @@ function MonkeyConfig(data) {
             body.removeChild(openLayer);
             shadowRoot = null;
             iframeFallback = document.createElement('iframe');
-            iframeFallback.style.cssText = `position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ${data.width} !important; height: ${data.height} !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;`;
+            iframeFallback.style.cssText = `position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ${data.iframeWidth} !important; height: ${data.iframeHeight} !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;`;
             body.appendChild(iframeFallback);
             const iframeDoc = iframeFallback.contentDocument;
             iframeDoc.open();
@@ -175,7 +177,9 @@ function MonkeyConfig(data) {
             iframeDoc.close();
             openLayer = iframeFallback;
             openDone(iframeDoc);
-        } else openDone(shadowRoot);
+        } else {
+            openDone(shadowRoot);
+        }
     }
 
     function close() {
@@ -216,7 +220,7 @@ MonkeyConfig.formatters = {
 MonkeyConfig.res = {
     icons: {
         arrow_undo: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
-        cancel: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1BN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
+        cancel: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
         tick: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC',
         home: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAACB0RVh0U29mdHdhcmUATWFjcm9tZWRpYSBGaXJld29ya3MgTVi7kSokAAAAFnRFWHRDcmVhdGlvbiBUaW1lADExLzA1LzA33bqJ2wAAAlxJREFUeJx9U0tIVGEU/v7fe30wLQxCDKdykmrUCiqTIgrG1pGBMElto1VQyySMWhVl0qJNix6QGLhQWom6isRHE5SWBWLFNGqlmTWOd+bOf85pcfU6I9WBsznn+77z4BwlIsi1089e791QWHDNVqrOUggaJiQzJpFyTSzpmqsDZ46M5eJVrsC53rfdtlaNsa+/EE86cMnL2VqhrMRCKGDDMdTTf/boqTyBqcXl4ruvPk9O/VwODs0s4n8WClgotZDYF5Adt5siaQ0AN4Y/dv6NHA1vRntDdV7sU8pgLk3B5wumEwDUhf53Bw3L6NMPs+vI5WiPhMECdL2ZwqWhL3n5qkICMdcXhKPnH43NJasW0tk88p1IGCwCFmBXWSm22IS+xG8fYwRQTJV6Y1FBTTzp/IO85id3V+JmfYWPS7GCJlNjEUvF6raj4XK0RcIgETCL3wGLQERwonYbWASXX86AoWCIKrRh8lUvHqj0iJxbncEinqgIjm0vh/1jxhuDGDqTpWlbKwDA4Y5h0AqYRPDwxRgeD46vibHg+K0OaGcJSgRZ4mk957gTZSWW30UuuK1vBG19IyAWz1eOLhPcCYtcuNATulijJRSwfQFaGWEVnN5anbfMVdPpFEw226K7mg7FHEM9oYDld0DrwMTsdwEAVnoJWZae+dbmmAUADZsKmwe+OZPBIhUMPxhEcfx93tHsfzLqx7QCOOMk3Nl4M7Dumerv93cLc+N3o5BiBYa3XCUCi1zodMqrfCWa/0y5Vnuvdw+YrgtRHZEJGmK4jERWJGZEtc63NI3n4v8As6uX85AjWHEAAAAASUVORK5CYII='
     },
