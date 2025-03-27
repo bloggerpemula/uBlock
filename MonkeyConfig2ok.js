@@ -19,10 +19,12 @@ function MonkeyConfig(data) {
 
     function init() {
         data.buttons = data.buttons || ['save', 'defaults', 'cancel', 'homepage'];
-        data.fontSize = data.fontSize || '11pt';
+        data.fontSize = data.fontSize || '11pt'; // Ukuran font default
         data.fontColor = data.fontColor || '#000000';
-        data.width = data.width || '600px';
-        data.height = data.height || 'auto';
+        data.shadowWidth = data.shadowWidth || '600px'; // Lebar default untuk Shadow DOM
+        data.shadowHeight = data.shadowHeight || 'auto'; // Tinggi default untuk Shadow DOM
+        data.iframeWidth = data.iframeWidth || '600px'; // Lebar default untuk iframe
+        data.iframeHeight = data.iframeHeight || '300px'; // Tinggi default untuk iframe
         data.title = data.title || (typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration');
         
         storageKey = '_MonkeyConfig_' + data.title.replace(/[^a-zA-Z0-9]/g, '_') + '_cfg';
@@ -81,9 +83,16 @@ function MonkeyConfig(data) {
             else if (param.type === 'radio') { const radio = root.querySelector(`[name="${key}"][value="${values[key]}"]`); if (radio) radio.checked = true; }
             else if (param.type === 'file') elem.value = '';
             else if (param.type === 'select') {
-                if (elem.type === 'checkbox') root.querySelectorAll(`input[name="${key}"]`).forEach(cb => cb.checked = values[key].includes(cb.value));
-                else if (elem.multiple) root.querySelectorAll(`select[name="${key}"] option`).forEach(opt => opt.selected = values[key].includes(opt.value));
-                else elem.value = values[key];
+                const currentValue = values[key];
+                if (elem.type === 'checkbox') {
+                    const checkboxes = root.querySelectorAll(`input[name="${key}"]`);
+                    checkboxes.forEach(cb => cb.checked = currentValue.includes(cb.value));
+                } else if (elem.multiple) {
+                    const options = root.querySelectorAll(`select[name="${key}"] option`);
+                    options.forEach(opt => opt.selected = currentValue.includes(opt.value));
+                } else {
+                    elem.value = currentValue;
+                }
             }
             elem.style.fontSize = param.fontSize || data.fontSize;
             elem.style.color = param.fontColor || data.fontColor;
@@ -103,7 +112,7 @@ function MonkeyConfig(data) {
             if (!elem) continue;
             if (param.type === 'checkbox') values[key] = elem.checked;
             else if (param.type === 'custom' && param.get) values[key] = param.get(root.querySelector(`#__MonkeyConfig_parent_${key}`));
-            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) values[key] = elem.value;
+            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) elem.value = values[key];
             else if (param.type === 'radio') values[key] = root.querySelector(`[name="${key}"]:checked`)?.value || '';
             else if (param.type === 'file') values[key] = elem.dataset.value || values[key];
             else if (param.type === 'select') {
@@ -145,7 +154,7 @@ function MonkeyConfig(data) {
                 h1 { font-size: inherit !important; font-weight: normal !important; margin: 0 !important; padding: 0 !important; }
                 ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
                 .__MonkeyConfig_overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.6) !important; z-index: 2147483646 !important; }
-                .__MonkeyConfig_container { position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; z-index: 2147483647 !important; width: ${data.width} !important; height: ${data.height} !important; max-width: 90vw !important; max-height: 80vh !important; overflow-y: auto !important; }
+                .__MonkeyConfig_container { position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; z-index: 2147483647 !important; width: ${data.shadowWidth} !important; height: ${data.shadowHeight} !important; max-width: 90vw !important; max-height: 80vh !important; overflow-y: auto !important; }
             </style>
             <div class="__MonkeyConfig_overlay"></div>
             ${render()}
@@ -160,7 +169,7 @@ function MonkeyConfig(data) {
             body.removeChild(openLayer);
             shadowRoot = null;
             iframeFallback = document.createElement('iframe');
-            iframeFallback.style.cssText = `position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ${data.width} !important; height: ${data.height} !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;`;
+            iframeFallback.style.cssText = `position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ${data.iframeWidth} !important; height: ${data.iframeHeight} !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;`;
             body.appendChild(iframeFallback);
             const iframeDoc = iframeFallback.contentDocument;
             iframeDoc.open();
@@ -168,7 +177,9 @@ function MonkeyConfig(data) {
             iframeDoc.close();
             openLayer = iframeFallback;
             openDone(iframeDoc);
-        } else openDone(shadowRoot);
+        } else {
+            openDone(shadowRoot);
+        }
     }
 
     function close() {
@@ -217,3 +228,41 @@ MonkeyConfig.res = {
         main: `:host, body { all: initial; font-family: Arial, sans-serif !important; display: block !important; isolation: isolate; }.__MonkeyConfig_container { display: flex !important; flex-direction: column !important; padding: 1em !important; font-size: __FONT_SIZE__ !important; color: __FONT_COLOR__ !important; background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; border-radius: 0.5em !important; box-shadow: 2px 2px 16px #000 !important; box-sizing: border-box !important; }.__MonkeyConfig_container h1 { border-bottom: solid 1px #999 !important; font-size: 120% !important; font-weight: normal !important; margin: 0 0 0.5em 0 !important; padding: 0 0 0.3em 0 !important; text-align: center !important; }.__MonkeyConfig_content { flex: 1 !important; overflow-y: auto !important; max-height: 60vh !important; }.__MonkeyConfig_top, .__MonkeyConfig_bottom { margin-bottom: 1em !important; }.__MonkeyConfig_columns { display: flex !important; justify-content: space-between !important; margin-bottom: 1em !important; }.__MonkeyConfig_left_column, .__MonkeyConfig_right_column { width: 48% !important; }.__MonkeyConfig_container table { border-spacing: 0 !important; margin: 0 !important; width: 100% !important; }.__MonkeyConfig_container td { border: none !important; line-height: 100% !important; padding: 0.3em !important; text-align: left !important; vertical-align: middle !important; white-space: normal !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline { display: flex !important; align-items: center !important; white-space: nowrap !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline label { margin-right: 0.5em !important; flex-shrink: 0 !important; display: block !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] { flex-grow: 0 !important; margin: 0 0.3em 0 0 !important; display: inline-block !important; width: 16px !important; height: 16px !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"], .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="text"] { flex-grow: 0 !important; width: 100px !important; min-width: 50px !important; }.__MonkeyConfig_buttons_container { margin-top: 1em !important; border-top: solid 1px #999 !important; padding-top: 0.6em !important; text-align: center !important; }.__MonkeyConfig_buttons_container table { width: auto !important; margin: 0 auto !important; }.__MonkeyConfig_buttons_container td { padding: 0.3em !important; }.__MonkeyConfig_container button { background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important; border: solid 1px !important; border-radius: 0.5em !important; box-shadow: 0 0 1px #000 !important; padding: 3px 8px 3px 24px !important; white-space: nowrap !important; }.__MonkeyConfig_container button img { vertical-align: middle !important; }.__MonkeyConfig_container label { line-height: 120% !important; vertical-align: middle !important; display: inline-block !important; }.__MonkeyConfig_container textarea { vertical-align: text-top !important; width: 100% !important; white-space: pre-wrap !important; resize: vertical !important; text-align: left !important; }.__MonkeyConfig_container input[type="text"], .__MonkeyConfig_container input[type="number"], .__MonkeyConfig_container input[type="color"] { background: #fff !important; }.__MonkeyConfig_container button:hover { background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%) !important; }@media (max-width: 600px) { .__MonkeyConfig_columns { flex-direction: column !important; } .__MonkeyConfig_left_column, .__MonkeyConfig_right_column { width: 100% !important; } }`
     }
 };
+
+// Contoh penggunaan MonkeyConfig
+(function() {
+    // Contoh konfigurasi kustom untuk Shadow DOM dan iframe
+    const config = new MonkeyConfig({
+        title: "Custom Configuration",
+        menuCommand: true, // Menampilkan menu di userscript manager
+        parameters: {
+            enableFeature: { type: "checkbox", default: true, label: "Enable Feature" },
+            textInput: { type: "text", default: "Hello", label: "Text Input" },
+            fontSize: { type: "number", default: 14, label: "Font Size (px)" }
+        },
+        shadowWidth: "800px",    // Lebar Shadow DOM
+        shadowHeight: "auto",    // Tinggi Shadow DOM (otomatis menyesuaikan konten)
+        iframeWidth: "700px",    // Lebar iframe
+        iframeHeight: "400px",   // Tinggi iframe
+        fontSize: "16px",        // Ukuran font kustom
+        fontColor: "#333333",    // Warna font kustom
+        onSave: function(values) {
+            console.log("Saved values:", values);
+        }
+    });
+
+    // Contoh lain dengan ukuran berbeda untuk perangkat kecil
+    const mobileConfig = new MonkeyConfig({
+        title: "Mobile Configuration",
+        menuCommand: "Open Mobile Config",
+        parameters: {
+            darkMode: { type: "checkbox", default: false, label: "Dark Mode" },
+            username: { type: "text", default: "User", label: "Username" }
+        },
+        shadowWidth: "90vw",     // Lebar Shadow DOM relatif ke viewport
+        shadowHeight: "auto",    // Tinggi Shadow DOM otomatis
+        iframeWidth: "80vw",     // Lebar iframe relatif ke viewport
+        iframeHeight: "250px",   // Tinggi iframe lebih kecil
+        fontSize: "12px"         // Ukuran font lebih kecil untuk mobile
+    });
+})();
