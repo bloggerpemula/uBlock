@@ -1,9 +1,10 @@
 // ==UserScript==
-// @name           MonkeyConfig Mod
+// @name            MonkeyConfig Mod
 // @noframes
-// @version        1.9
-// @namespace      http://odyniec.net/
-// @description    Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
+// @version         2.2
+// @namespace       http://odyniec.net/
+// @contributionURL https://saweria.co/Bloggerpemula
+// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
 // ==/UserScript==
 /*
  * MonkeyConfig Modern Reloaded Enhanced
@@ -16,6 +17,12 @@
  * Modified: Added per-parameter font-size and font-color customization - March 2025
  * Fixed: Ensured per-parameter font-size and font-color apply correctly - March 2025
  * Fixed: Improved Shadow DOM isolation for consistent styling across sites - March 2025
+ * Fixed: Overlay z-index to ensure dialog is clickable - March 2025
+ * Fixed: Adjusted overlay size to fit dialog content - March 2025
+ * Added: Optional adjustOverlaySize parameter for custom overlay margin - March 2025
+ * Fixed: Enhanced Shadow DOM isolation to prevent host page CSS interference - March 2025
+ * Fixed: Moved all styling into Shadow DOM to fully isolate __MonkeyConfig_layer - March 2025
+ * Fixed: Restored overlay visibility by ensuring proper sizing and positioning - March 2025
  */
 function MonkeyConfig(data) {
     var cfg = this,
@@ -34,6 +41,7 @@ function MonkeyConfig(data) {
         data.fontColor = data.fontColor || '#000000';
         data.width = data.width || '600px';  // Default width
         data.height = data.height || 'auto'; // Default height
+        data.adjustOverlaySize = data.adjustOverlaySize || null; // Parameter baru, null jika tidak ditentukan
         if (!data.title) {
             data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
         }
@@ -260,53 +268,95 @@ function MonkeyConfig(data) {
             if (cancelBtn) cancelBtn.addEventListener('click', cancelClick, false);
             displayed = true;
             update();
+            if (data.adjustOverlaySize) { adjustOverlaySize(); } else { defaultOverlaySize(); }
+        }
+
+        function adjustOverlaySize() {
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            var containerRect = container.getBoundingClientRect();
+            var margin = parseInt(data.adjustOverlaySize, 10) || 40; // Gunakan nilai dari parameter atau default 40px
+            overlay.style.width = (containerRect.width + margin) + 'px';
+            overlay.style.height = (containerRect.height + margin) + 'px';
+            overlay.style.left = '50%';
+            overlay.style.top = '50%';
+            overlay.style.transform = 'translate(-50%, -50%)';
+        }
+
+        function defaultOverlaySize() {
+            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
+            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+            var containerRect = container.getBoundingClientRect();
+            overlay.style.width = containerRect.width + 'px';
+            overlay.style.height = containerRect.height + 'px';
+            overlay.style.left = '50%';
+            overlay.style.top = '50%';
+            overlay.style.transform = 'translate(-50%, -50%)';
         }
 
         var body = document.querySelector('body');
         openLayer = document.createElement('div');
-        openLayer.className = '__MonkeyConfig_layer';
-
-        // Buat Shadow DOM
         shadowRoot = openLayer.attachShadow({ mode: 'open' });
-
-        // Tambahkan overlay dan container ke dalam Shadow DOM
         shadowRoot.innerHTML = `
             <style>
                 :host {
-                    all: initial; /* Reset semua properti CSS ke nilai awal */
+                    all: initial; /* Reset semua properti CSS */
                     display: block;
                     font-family: Arial, sans-serif; /* Tentukan font default */
                 }
+                .__MonkeyConfig_layer {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    z-index: 10000;
+                    width: ${data.width};
+                    height: ${data.height};
+                    contain: strict; /* Isolasi layout, paint, dan style */
+                }
                 ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
                 .__MonkeyConfig_overlay {
-                    position: fixed;
-                    left: 0;
-                    top: 0;
-                    width: 100vw;
-                    height: 100vh;
-                    z-index: 9999;
-                    background-color: #000;
-                    opacity: 0.6;
+                    position: absolute;
+                    background: rgba(0, 0, 0, 0.6); /* Background eksplisit */
+                    z-index: 1; /* Overlay di belakang container */
+                    border-radius: 0.5em; /* Sesuaikan dengan container */
+                    pointer-events: none; /* Tidak mengganggu interaksi */
+                }
+                .__MonkeyConfig_container {
+                    position: relative; /* Pastikan container di atas overlay */
+                    z-index: 2; /* Container di depan overlay */
+                    background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; /* Paksa background */
                 }
             </style>
-            <div class="__MonkeyConfig_overlay"></div>
-            ${render()}
+            <div class="__MonkeyConfig_layer">
+                <div class="__MonkeyConfig_overlay"></div>
+                ${render()}
+            </div>
         `;
-
         container = shadowRoot.querySelector('.__MonkeyConfig_container');
-        openLayer.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-height:80vh;overflow-y:auto;z-index:10000;width:' + data.width + ';height:' + data.height + ';';
         body.appendChild(openLayer);
         openDone();
 
-        window.addEventListener('resize', function () {
-            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-            overlay.style.width = window.innerWidth + 'px';
-            overlay.style.height = window.innerHeight + 'px';
-        });
+        // Tambahkan event listener resize
+        if (data.adjustOverlaySize) {
+            window.addEventListener('resize', adjustOverlaySize);
+        } else {
+            window.addEventListener('resize', defaultOverlaySize);
+        }
     }
 
     function close() {
-        if (openLayer) { openLayer.parentNode.removeChild(openLayer); openLayer = undefined; }
+        if (openLayer) { 
+            if (data.adjustOverlaySize) {
+                window.removeEventListener('resize', adjustOverlaySize);
+            } else {
+                window.removeEventListener('resize', defaultOverlaySize);
+            }
+            openLayer.parentNode.removeChild(openLayer); 
+            openLayer = undefined; 
+        }
         shadowRoot = undefined;
         displayed = false;
     }
@@ -385,7 +435,7 @@ MonkeyConfig.formatters = {
 MonkeyConfig.res = {
     icons: {
         'arrow_undo': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
-        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1BN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
+        'cancel': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
         'tick': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC'
     },
     stylesheets: {
@@ -407,7 +457,7 @@ MonkeyConfig.res = {
                 max-width: 90vw;
                 width: 100%;
                 height: 100%;
-                position: relative;
+                position: relative; /* Pastikan posisi relatif untuk z-index */
                 box-sizing: border-box;
             }
             .__MonkeyConfig_container h1 {
