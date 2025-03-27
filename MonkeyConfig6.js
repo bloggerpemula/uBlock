@@ -1,31 +1,19 @@
 // ==UserScript==
 // @name            MonkeyConfig Mod
 // @noframes
-// @version         2.5
+// @version         2.11
 // @namespace       http://odyniec.net/
 // @contributionURL https://saweria.co/Bloggerpemula
 // @description     Enhanced Configuration Dialog Builder with column layout, custom styling, and Additional input types
+// @match           *://*/*
 // ==/UserScript==
 /*
  * MonkeyConfig Modern Reloaded Enhanced
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
- * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
- * Modified: Added text-align option for labels, reduced width of number and text fields - March 2025
- * Modified: Added per-parameter font-size and font-color customization - March 2025
- * Fixed: Ensured per-parameter font-size and font-color apply correctly - March 2025
- * Fixed: Improved Shadow DOM isolation for consistent styling across sites - March 2025
- * Fixed: Overlay z-index to ensure dialog is clickable - March 2025
- * Fixed: Adjusted overlay size to fit dialog content - March 2025
- * Added: Optional adjustOverlaySize parameter for custom overlay margin - March 2025
- * Fixed: Enhanced Shadow DOM isolation to prevent host page CSS interference - March 2025
- * Fixed: Moved all styling into Shadow DOM to fully isolate __MonkeyConfig_layer - March 2025
- * Fixed: Restored overlay visibility by ensuring proper sizing and positioning - March 2025
- * Fixed: Added debugging for menuCommand and open function - March 2025
- * Fixed: Ensured dialog visibility with explicit CSS - March 2025
- * Fixed: Forced visibility and positioning for dialog rendering - March 2025
+ * Fixed: Forced container width and height - March 2025
+ * Fixed: Moved overlay outside Shadow DOM - March 2025
  */
 function MonkeyConfig(data) {
     var cfg = this,
@@ -35,7 +23,8 @@ function MonkeyConfig(data) {
         displayed,
         openLayer,
         shadowRoot,
-        container;
+        container,
+        overlay;
 
     function init() {
         console.log('MonkeyConfig: Initializing...');
@@ -45,9 +34,8 @@ function MonkeyConfig(data) {
         data.fontColor = data.fontColor || '#000000';
         data.width = data.width || '600px';
         data.height = data.height || 'auto';
-        data.adjustOverlaySize = data.adjustOverlaySize || null;
         if (!data.title) {
-            data.title = typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration';
+            data.title = typeof GM_info === 'object' ? GM_info.script.name + ' Configuration' : 'Configuration';
         }
         var safeTitle = data.title.replace(/[^a-zA-Z0-9]/g, '_');
         storageKey = '_MonkeyConfig_' + safeTitle + '_cfg';
@@ -275,6 +263,43 @@ function MonkeyConfig(data) {
         close(); 
     }
 
+    function forcePositionAndSize() {
+        var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
+        var container = shadowRoot.querySelector('.__MonkeyConfig_container');
+        var viewportHeight = window.innerHeight;
+        var viewportWidth = window.innerWidth;
+        var dialogWidth = parseInt(data.width, 10); // Misalnya 600
+        var dialogHeight = container.getBoundingClientRect().height; // Tinggi aktual container
+        var maxHeight = viewportHeight * 0.8;
+
+        // Paksa lebar dan tinggi container
+        container.style.width = `${dialogWidth}px`;
+        container.style.minWidth = `${dialogWidth}px`;
+        container.style.maxWidth = `${dialogWidth}px`;
+        container.style.height = 'auto';
+        container.style.maxHeight = `${maxHeight}px`;
+        container.style.overflowY = 'auto';
+
+        // Paksa posisi layer
+        layer.style.position = 'fixed';
+        layer.style.width = `${dialogWidth}px`;
+        layer.style.minWidth = `${dialogWidth}px`;
+        layer.style.maxWidth = `${dialogWidth}px`;
+        layer.style.height = `${dialogHeight}px`;
+        layer.style.maxHeight = `${maxHeight}px`;
+        layer.style.overflowY = 'auto';
+        layer.style.zIndex = '10000';
+
+        // Hitung ulang posisi dengan tinggi aktual
+        dialogHeight = Math.min(dialogHeight, maxHeight);
+        layer.style.top = `${Math.max(0, (viewportHeight - dialogHeight) / 2)}px`;
+        layer.style.left = `${(viewportWidth - dialogWidth) / 2}px`;
+
+        console.log('MonkeyConfig: Forced position - top:', layer.style.top, 'left:', layer.style.left, 'width:', layer.style.width, 'height:', dialogHeight + 'px', 'max-height:', maxHeight + 'px');
+        console.log('MonkeyConfig: Container effective width:', container.getBoundingClientRect().width);
+        console.log('MonkeyConfig: Container height:', dialogHeight);
+    }
+
     function open() {
         console.log('MonkeyConfig: Opening dialog...');
         function openDone() {
@@ -285,6 +310,7 @@ function MonkeyConfig(data) {
             var saveBtn = shadowRoot.querySelector('#__MonkeyConfig_button_save');
             var defaultsBtn = shadowRoot.querySelector('#__MonkeyConfig_button_defaults');
             var cancelBtn = shadowRoot.querySelector('#__MonkeyConfig_button_cancel');
+            var buttonsContainer = shadowRoot.querySelector('.__MonkeyConfig_buttons_container');
             if (saveBtn) {
                 saveBtn.addEventListener('click', saveClick, false);
                 console.log('MonkeyConfig: Save button initialized');
@@ -300,48 +326,25 @@ function MonkeyConfig(data) {
             displayed = true;
             update();
 
-            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
             var layer = shadowRoot.querySelector('.__MonkeyConfig_layer');
-            console.log('MonkeyConfig: Layer element:', layer);
-            console.log('MonkeyConfig: Overlay element:', overlay);
-            console.log('MonkeyConfig: Container element:', container);
-            console.log('MonkeyConfig: Layer position:', layer.getBoundingClientRect());
-            console.log('MonkeyConfig: Overlay position:', overlay.getBoundingClientRect());
-            console.log('MonkeyConfig: Container position:', container.getBoundingClientRect());
+            console.log('MonkeyConfig: Layer element exists:', !!layer);
+            console.log('MonkeyConfig: Overlay element exists:', !!overlay);
+            console.log('MonkeyConfig: Container element exists:', !!container);
+            console.log('MonkeyConfig: Buttons container exists:', !!buttonsContainer);
+            console.log('MonkeyConfig: Viewport size - width:', window.innerWidth, 'height:', window.innerHeight);
+            console.log('MonkeyConfig: Document body size - width:', document.body.scrollWidth, 'height:', document.body.scrollHeight);
+            console.log('MonkeyConfig: Layer position before force:', layer ? layer.getBoundingClientRect() : 'null');
+            console.log('MonkeyConfig: Overlay position before:', overlay ? overlay.getBoundingClientRect() : 'null');
+            console.log('MonkeyConfig: Container position:', container ? container.getBoundingClientRect() : 'null');
 
-            if (data.adjustOverlaySize) { 
-                adjustOverlaySize(); 
-                console.log('MonkeyConfig: Adjusted overlay size');
-            } else { 
-                defaultOverlaySize(); 
-                console.log('MonkeyConfig: Set default overlay size');
+            if (layer && overlay && container) {
+                forcePositionAndSize(); // Paksa posisi dengan tinggi aktual
+                console.log('MonkeyConfig: Layer position after force:', layer.getBoundingClientRect());
+                console.log('MonkeyConfig: Overlay position after:', overlay.getBoundingClientRect());
+                console.log('MonkeyConfig: Buttons container position:', buttonsContainer ? buttonsContainer.getBoundingClientRect() : 'null');
+            } else {
+                console.error('MonkeyConfig: One or more elements are missing');
             }
-        }
-
-        function adjustOverlaySize() {
-            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
-            var containerRect = container.getBoundingClientRect();
-            var margin = parseInt(data.adjustOverlaySize, 10) || 40;
-            overlay.style.width = (containerRect.width + margin) + 'px';
-            overlay.style.height = (containerRect.height + margin) + 'px';
-            overlay.style.left = '50%';
-            overlay.style.top = '50%';
-            overlay.style.transform = 'translate(-50%, -50%)';
-            console.log('MonkeyConfig: Overlay size adjusted - width:', overlay.style.width, 'height:', overlay.style.height);
-        }
-
-        function defaultOverlaySize() {
-            var overlay = shadowRoot.querySelector('.__MonkeyConfig_overlay');
-            var container = shadowRoot.querySelector('.__MonkeyConfig_container');
-            var containerRect = container.getBoundingClientRect();
-            overlay.style.width = containerRect.width + 'px';
-            overlay.style.height = containerRect.height + 'px';
-            overlay.style.left = '50%';
-            overlay.style.top = '50%';
-            overlay.style.transform = 'translate(-50%, -50%)';
-            console.log('MonkeyConfig: Overlay size set - width:', overlay.style.width, 'height:', overlay.style.height);
         }
 
         try {
@@ -350,6 +353,21 @@ function MonkeyConfig(data) {
                 console.error('MonkeyConfig: Body not found');
                 return;
             }
+            // Buat overlay di luar Shadow DOM
+            overlay = document.createElement('div');
+            overlay.className = '__MonkeyConfig_overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100vw';
+            overlay.style.height = '100vh';
+            overlay.style.background = 'rgba(0, 0, 0, 0.6)';
+            overlay.style.zIndex = '9999';
+            overlay.style.borderRadius = '0';
+            overlay.style.pointerEvents = 'none';
+            overlay.style.visibility = 'visible';
+            body.appendChild(overlay);
+
             openLayer = document.createElement('div');
             shadowRoot = openLayer.attachShadow({ mode: 'open' });
             shadowRoot.innerHTML = `
@@ -364,53 +382,40 @@ function MonkeyConfig(data) {
                         width: 100vw !important;
                         height: 100vh !important;
                         z-index: 999999 !important;
+                        background: transparent !important;
                     }
                     .__MonkeyConfig_layer {
-                        position: absolute !important;
-                        top: 50% !important;
-                        left: 50% !important;
-                        transform: translate(-50%, -50%) !important;
-                        max-height: 80vh;
-                        overflow-y: auto;
+                        position: fixed !important;
                         z-index: 10000 !important;
                         width: ${data.width} !important;
-                        height: ${data.height} !important;
+                        min-width: ${data.width} !important;
+                        max-width: ${data.width} !important;
                         background: transparent !important;
                         visibility: visible !important;
                     }
                     ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
-                    .__MonkeyConfig_overlay {
-                        position: absolute !important;
-                        background: rgba(0, 0, 0, 0.6) !important;
-                        z-index: 1 !important;
-                        border-radius: 0.5em !important;
-                        pointer-events: none !important;
-                        visibility: visible !important;
-                    }
                     .__MonkeyConfig_container {
                         position: relative !important;
-                        z-index: 2 !important;
+                        z-index: 10000 !important;
                         background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
-                        width: 100% !important;
+                        width: ${data.width} !important;
+                        min-width: ${data.width} !important;
+                        max-width: ${data.width} !important;
                         height: auto !important;
                         min-height: 100px !important;
                         visibility: visible !important;
+                        border-radius: 0.5em !important;
+                        box-sizing: border-box !important;
                     }
                 </style>
                 <div class="__MonkeyConfig_layer">
-                    <div class="__MonkeyConfig_overlay"></div>
                     ${render()}
                 </div>
             `;
             container = shadowRoot.querySelector('.__MonkeyConfig_container');
             body.appendChild(openLayer);
             console.log('MonkeyConfig: Dialog appended to body');
-            openDone();
-            if (data.adjustOverlaySize) {
-                window.addEventListener('resize', adjustOverlaySize);
-            } else {
-                window.addEventListener('resize', defaultOverlaySize);
-            }
+            setTimeout(openDone, 200); // Beri waktu lebih untuk rendering
         } catch (e) {
             console.error('MonkeyConfig: Error in open function:', e);
         }
@@ -419,13 +424,12 @@ function MonkeyConfig(data) {
     function close() {
         console.log('MonkeyConfig: Closing dialog...');
         if (openLayer) {
-            if (data.adjustOverlaySize) {
-                window.removeEventListener('resize', adjustOverlaySize);
-            } else {
-                window.removeEventListener('resize', defaultOverlaySize);
-            }
             openLayer.parentNode.removeChild(openLayer);
             openLayer = undefined;
+        }
+        if (overlay) {
+            overlay.parentNode.removeChild(overlay);
+            overlay = undefined;
         }
         shadowRoot = undefined;
         displayed = false;
@@ -524,8 +528,9 @@ MonkeyConfig.res = {
                 background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important;
                 border-radius: 0.5em !important;
                 box-shadow: 2px 2px 16px #000 !important;
-                max-width: 90vw !important;
                 width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
                 height: auto !important;
                 min-height: 100px !important;
                 position: relative !important;
@@ -542,7 +547,7 @@ MonkeyConfig.res = {
             .__MonkeyConfig_content {
                 flex: 1 !important;
                 overflow-y: auto !important;
-                max-height: 60vh !important;
+                max-height: 400px !important;
             }
             .__MonkeyConfig_top, .__MonkeyConfig_bottom {
                 margin-bottom: 1em !important;
@@ -596,6 +601,7 @@ MonkeyConfig.res = {
                 border-top: solid 1px #999 !important;
                 padding-top: 0.6em !important;
                 text-align: center !important;
+                flex-shrink: 0 !important;
             }
             .__MonkeyConfig_buttons_container table {
                 width: auto !important;
