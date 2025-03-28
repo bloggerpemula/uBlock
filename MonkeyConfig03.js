@@ -1,41 +1,46 @@
 // ==UserScript==
 // @name            MonkeyConfig Mod
 // @noframes
-// @version         2.1
+// @version         2.2
 // @namespace       http://odyniec.net/
 // @contributionURL https://saweria.co/Bloggerpemula
 // @description     Enhanced Configuration Dialog Builder with column layout, custom styling, additional input types
 // ==/UserScript==
-
 function MonkeyConfig(data) {
     let cfg = this, params = data.parameters || data.params, values = {}, storageKey,
         displayed, openLayer, shadowRoot, container, iframeFallback;
 
     function log(message) {
         if (message === 'Dialog appended to body via Shadow DOM' || message === 'Shadow DOM failed, switching to iframe fallback') {
-            console.log(`[MonkeyConfig v2.1] ${message}`);
+            console.log(`[MonkeyConfig v2.2] ${message}`);
         }
     }
 
     function init() {
-        data.buttons = data.buttons || ['save', 'defaults', 'cancel', 'homepage'];
-        data.fontSize = data.fontSize || '11pt'; // Ukuran font default
-        data.fontColor = data.fontColor || '#000000';
-        data.shadowWidth = data.shadowWidth || '600px'; // Lebar default untuk Shadow DOM
-        data.shadowHeight = data.shadowHeight || 'auto'; // Tinggi default untuk Shadow DOM
-        data.iframeWidth = data.iframeWidth || '600px'; // Lebar default untuk iframe
-        data.iframeHeight = data.iframeHeight || '300px'; // Tinggi default untuk iframe
-        data.title = data.title || (typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration');
-        
+        data.buttons = data.buttons || ['save', 'reset', 'close', 'reload', 'homepage'];
         storageKey = '_MonkeyConfig_' + data.title.replace(/[^a-zA-Z0-9]/g, '_') + '_cfg';
         const storedValues = GM_getValue(storageKey) ? JSON.parse(GM_getValue(storageKey)) : {};
 
+        // Prioritaskan nilai dari data, lalu storedValues, lalu default
+        this.shadowWidth = data.shadowWidth || storedValues.shadowWidth || "600px";
+        this.shadowHeight = data.shadowHeight || storedValues.shadowHeight || "400px";
+        this.iframeWidth = data.iframeWidth || storedValues.iframeWidth || "600px";
+        this.iframeHeight = data.iframeHeight || storedValues.iframeHeight || "300px";
+        this.shadowFontSize = data.shadowFontSize || storedValues.shadowFontSize || "14px";
+        this.shadowFontColor = data.shadowFontColor || storedValues.shadowFontColor || "#000000";
+        this.iframeFontSize = data.iframeFontSize || storedValues.iframeFontSize || "14px";
+        this.iframeFontColor = data.iframeFontColor || storedValues.iframeFontColor || "#000000";
+        this.title = data.title || (typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration');
+
+        // Log nilai awal untuk debugging
+        log(`Initialized with shadowWidth: ${this.shadowWidth}, shadowHeight: ${this.shadowHeight}`);
+
         for (let key in params) {
             const param = params[key];
-            values[key] = param.value ?? storedValues[key] ?? param.default ?? '';
+            values[key] = storedValues[key] ?? param.default ?? '';
         }
 
-        if (data.menuCommand) GM_registerMenuCommand(data.menuCommand === true ? data.title : data.menuCommand, () => cfg.open());
+        if (data.menuCommand) GM_registerMenuCommand(data.menuCommand === true ? this.title : data.menuCommand, () => cfg.open());
         cfg.open = open;
         cfg.close = close;
         cfg.get = name => values[name];
@@ -48,7 +53,7 @@ function MonkeyConfig(data) {
     }
 
     function render() {
-        let html = `<div class="__MonkeyConfig_container"><h1>${data.title}</h1><div class="__MonkeyConfig_content"><div class="__MonkeyConfig_top">`;
+        let html = `<div class="__MonkeyConfig_container"><h1>${this.title}</h1><div class="__MonkeyConfig_content"><div class="__MonkeyConfig_top">`;
         for (let key in params) if (params[key].column === 'top') html += MonkeyConfig.formatters.tr(key, params[key]);
         html += `</div><div class="__MonkeyConfig_columns"><div class="__MonkeyConfig_left_column">`;
         for (let key in params) if (params[key].column === 'left') html += MonkeyConfig.formatters.tr(key, params[key]);
@@ -61,9 +66,10 @@ function MonkeyConfig(data) {
         html += `</div></div><div class="__MonkeyConfig_buttons_container"><table><tr>`;
         data.buttons.forEach(btn => {
             html += '<td>';
-            if (btn === 'cancel') html += `<button type="button" id="__MonkeyConfig_button_cancel"><img src="data:image/png;base64,${MonkeyConfig.res.icons.cancel}" alt="Cancel"/> Cancel</button>`;
-            else if (btn === 'defaults') html += `<button type="button" id="__MonkeyConfig_button_defaults"><img src="data:image/png;base64,${MonkeyConfig.res.icons.arrow_undo}" alt="Defaults"/> Set Defaults</button>`;
-            else if (btn === 'save') html += `<button type="button" id="__MonkeyConfig_button_save"><img src="data:image/png;base64,${MonkeyConfig.res.icons.tick}" alt="Save"/> Save</button>`;
+            if (btn === 'save') html += `<button type="button" id="__MonkeyConfig_button_save"><img src="data:image/png;base64,${MonkeyConfig.res.icons.save}" alt="Save"/> Save</button>`;
+            else if (btn === 'reset') html += `<button type="button" id="__MonkeyConfig_button_reset"><img src="data:image/png;base64,${MonkeyConfig.res.icons.reset}" alt="Reset"/> Reset</button>`;
+            else if (btn === 'close') html += `<button type="button" id="__MonkeyConfig_button_close"><img src="data:image/png;base64,${MonkeyConfig.res.icons.close}" alt="Close"/> Close</button>`;
+            else if (btn === 'reload') html += `<button type="button" id="__MonkeyConfig_button_reload"><img src="data:image/png;base64,${MonkeyConfig.res.icons.reload}" alt="Reload"/> Reload</button>`;
             else if (btn === 'homepage') html += `<button type="button" id="__MonkeyConfig_button_homepage"><img src="data:image/png;base64,${MonkeyConfig.res.icons.home}" alt="Homepage"/> Homepage</button>`;
             html += '</td>';
         });
@@ -79,7 +85,7 @@ function MonkeyConfig(data) {
             if (!elem) continue;
             if (param.type === 'checkbox') elem.checked = !!values[key];
             else if (param.type === 'custom' && param.set) param.set(values[key], root.querySelector(`#__MonkeyConfig_parent_${key}`));
-            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) elem.value = values[key];
+            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) elem.value = values[key] || param.default;
             else if (param.type === 'radio') { const radio = root.querySelector(`[name="${key}"][value="${values[key]}"]`); if (radio) radio.checked = true; }
             else if (param.type === 'file') elem.value = '';
             else if (param.type === 'select') {
@@ -94,12 +100,19 @@ function MonkeyConfig(data) {
                     elem.value = currentValue;
                 }
             }
-            elem.style.fontSize = param.fontSize || data.fontSize;
-            elem.style.color = param.fontColor || data.fontColor;
+            const fontSize = shadowRoot ? this.shadowFontSize : this.iframeFontSize;
+            const defaultFontColor = shadowRoot ? this.shadowFontColor : this.iframeFontColor;
+            const labelFontColor = param.fontColor || defaultFontColor;
+            elem.style.fontSize = fontSize;
+            elem.style.color = labelFontColor;
+            if (param.type === 'checkbox' || param.type === 'textarea') {
+                elem.style.backgroundColor = 'inherit';
+                elem.style.color = labelFontColor;
+            }
             const label = root.querySelector(`label[for="__MonkeyConfig_field_${key}"]`);
             if (label) {
-                label.style.fontSize = param.fontSize || data.fontSize;
-                label.style.color = param.fontColor || data.fontColor;
+                label.style.fontSize = fontSize;
+                label.style.color = labelFontColor;
                 label.style.cssText += param.type === 'textarea' ? 'text-align:center;display:block;width:100%' : 'text-align:left;display:inline-block;width:auto';
             }
         }
@@ -112,7 +125,7 @@ function MonkeyConfig(data) {
             if (!elem) continue;
             if (param.type === 'checkbox') values[key] = elem.checked;
             else if (param.type === 'custom' && param.get) values[key] = param.get(root.querySelector(`#__MonkeyConfig_parent_${key}`));
-            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) elem.value = values[key];
+            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) values[key] = elem.value;
             else if (param.type === 'radio') values[key] = root.querySelector(`[name="${key}"]:checked`)?.value || '';
             else if (param.type === 'file') values[key] = elem.dataset.value || values[key];
             else if (param.type === 'select') {
@@ -121,10 +134,20 @@ function MonkeyConfig(data) {
                 else values[key] = elem.value;
             }
         }
-        GM_setValue(storageKey, JSON.stringify(values));
+        const allValues = {
+            ...values,
+            shadowWidth: this.shadowWidth,
+            shadowHeight: this.shadowHeight,
+            iframeWidth: this.iframeWidth,
+            iframeHeight: this.iframeHeight,
+            shadowFontSize: this.shadowFontSize,
+            shadowFontColor: this.shadowFontColor,
+            iframeFontSize: this.iframeFontSize,
+            iframeFontColor: this.iframeFontColor
+        };
+        GM_setValue(storageKey, JSON.stringify(allValues));
         close();
         if (data.onSave) data.onSave(values);
-        location.reload();
     }
 
     function open() {
@@ -132,10 +155,12 @@ function MonkeyConfig(data) {
             if (window.self !== window.top) return;
             const saveBtn = root.querySelector('#__MonkeyConfig_button_save');
             if (saveBtn) saveBtn.addEventListener('click', saveClick, false);
-            const defaultsBtn = root.querySelector('#__MonkeyConfig_button_defaults');
-            if (defaultsBtn) defaultsBtn.addEventListener('click', setDefaults, false);
-            const cancelBtn = root.querySelector('#__MonkeyConfig_button_cancel');
-            if (cancelBtn) cancelBtn.addEventListener('click', close, false);
+            const resetBtn = root.querySelector('#__MonkeyConfig_button_reset');
+            if (resetBtn) resetBtn.addEventListener('click', setDefaults, false);
+            const closeBtn = root.querySelector('#__MonkeyConfig_button_close');
+            if (closeBtn) closeBtn.addEventListener('click', close, false);
+            const reloadBtn = root.querySelector('#__MonkeyConfig_button_reload');
+            if (reloadBtn) reloadBtn.addEventListener('click', () => location.reload(), false);
             const homepageBtn = root.querySelector('#__MonkeyConfig_button_homepage');
             if (homepageBtn) homepageBtn.addEventListener('click', () => window.open('https://bloggerpemula.pythonanywhere.com/', '_blank'), false);
             displayed = true;
@@ -143,18 +168,27 @@ function MonkeyConfig(data) {
         }
 
         const body = document.querySelector('body') || document.documentElement;
-        if (!body) return;
+        if (!body) {
+            log("Body not found, cannot open dialog");
+            return;
+        }
 
         openLayer = document.createElement('div');
         openLayer.className = '__MonkeyConfig_layer';
         shadowRoot = openLayer.attachShadow({ mode: 'open' });
+
+        // Log dimensi yang akan digunakan
+        log(`Opening Shadow DOM with dimensions - Width: ${this.shadowWidth}, Height: ${this.shadowHeight}`);
+
+        // Terapkan dimensi secara eksplisit dan hindari override
+        const heightStyle = this.shadowHeight === 'auto' ? 'auto' : this.shadowHeight;
         shadowRoot.innerHTML = `
             <style>
-                :host { all: initial; display: block !important; font-family: Arial, sans-serif !important; isolation: isolate; z-index: 2147483647 !important; }
-                h1 { font-size: inherit !important; font-weight: normal !important; margin: 0 !important; padding: 0 !important; }
-                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}
+                :host { all: initial; display: block !important; font-family: Arial, sans-serif !important; isolation: isolate; z-index: 2147483647 !important; font-size: ${this.shadowFontSize} !important; color: ${this.shadowFontColor} !important; }
+                h1 { font-size: 120% !important; font-weight: normal !important; margin: 0 !important; padding: 0 !important; }
+                ${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, this.shadowFontSize).replace(/__FONT_COLOR__/g, this.shadowFontColor)}
                 .__MonkeyConfig_overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.6) !important; z-index: 2147483646 !important; }
-                .__MonkeyConfig_container { position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; z-index: 2147483647 !important; width: ${data.shadowWidth} !important; height: ${data.shadowHeight} !important; max-width: 90vw !important; max-height: 80vh !important; overflow-y: auto !important; }
+                .__MonkeyConfig_container { position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; z-index: 2147483647 !important; width: ${this.shadowWidth} !important; height: ${heightStyle} !important; max-width: 90vw !important; max-height: 80vh !important; overflow-y: auto !important; }
             </style>
             <div class="__MonkeyConfig_overlay"></div>
             ${render()}
@@ -164,16 +198,25 @@ function MonkeyConfig(data) {
         body.appendChild(openLayer);
         log('Dialog appended to body via Shadow DOM');
 
+        // Verifikasi apakah dimensi benar-benar diterapkan
+        const appliedWidth = container.offsetWidth;
+        const appliedHeight = container.offsetHeight;
+        log(`Actual applied dimensions - Width: ${appliedWidth}px, Height: ${appliedHeight}px`);
+
         if (!container || shadowRoot.querySelector('.__MonkeyConfig_overlay').offsetHeight === 0) {
             log('Shadow DOM failed, switching to iframe fallback');
             body.removeChild(openLayer);
             shadowRoot = null;
             iframeFallback = document.createElement('iframe');
-            iframeFallback.style.cssText = `position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ${data.iframeWidth} !important; height: ${data.iframeHeight} !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;`;
+
+            // Log dimensi iframe
+            log(`Switching to iframe with dimensions - Width: ${this.iframeWidth}, Height: ${this.iframeHeight}`);
+
+            iframeFallback.style.cssText = `position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ${this.iframeWidth} !important; height: ${this.iframeHeight} !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important;`;
             body.appendChild(iframeFallback);
             const iframeDoc = iframeFallback.contentDocument;
             iframeDoc.open();
-            iframeDoc.write(`<!DOCTYPE html><html><head><style>body { margin: 0 !important; padding: 0 !important; background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; font-family: Arial, sans-serif !important; font-size: ${data.fontSize} !important; color: ${data.fontColor} !important; }${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, data.fontSize).replace(/__FONT_COLOR__/g, data.fontColor)}.__MonkeyConfig_overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.6) !important; z-index: 2147483646 !important; }.__MonkeyConfig_container { position: relative !important; width: 100% !important; height: 100% !important; overflow-y: auto !important; }</style></head><body><div class="__MonkeyConfig_overlay"></div>${render()}</body></html>`);
+            iframeDoc.write(`<!DOCTYPE html><html><head><style>body { margin: 0 !important; padding: 0 !important; background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; font-family: Arial, sans-serif !important; font-size: ${this.iframeFontSize} !important; color: ${this.iframeFontColor} !important; }${MonkeyConfig.res.stylesheets.main.replace(/__FONT_SIZE__/g, this.iframeFontSize).replace(/__FONT_COLOR__/g, this.iframeFontColor)}.__MonkeyConfig_overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.6) !important; z-index: 2147483646 !important; }.__MonkeyConfig_container { position: relative !important; width: 100% !important; height: 100% !important; overflow-y: auto !important; }</style></head><body><div class="__MonkeyConfig_overlay"></div>${render()}</body></html>`);
             iframeDoc.close();
             openLayer = iframeFallback;
             openDone(iframeDoc);
@@ -219,9 +262,10 @@ MonkeyConfig.formatters = {
 
 MonkeyConfig.res = {
     icons: {
-        arrow_undo: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
-        cancel: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAHdSURBVDjLpZNraxpBFIb3a0ggISmmNISWXmOboKihxpgUNGWNSpvaS6RpKL3Ry//Mh1wgf6PElaCyzq67O09nVjdVlJbSDy8Lw77PmfecMwZg/I/GDw3DCo8HCkZl/RlgGA0e3Yfv7+DbAfLrW+SXOvLTG+SHV/gPbuMZRnsyIDL/OASziMxkkKkUQTJJsLaGn8/iHz6nd+8mQv87Ahg2H9Th/BxZqxEkEgSrq/iVCvLsDK9awtvfxb2zjD2ARID+lVVlbabTgWYTv1rFL5fBUtHbbeTJCb3EQ3ovCnRC6xAgzJtOE+ztheYIEkqbFaS3vY2zuIj77AmtYYDusPy8/zuvunJkDKXM7tYWTiyGWFjAqeQnAD6+7ueNx/FLpRGAru7mcoj5ebqzszil7DggeF/DX1nBN82rzPqrzbRayIsLhJqMPT2N83Sdy2GApwFqRN7jFPL0tF+10cDd3MTZ2AjNUkGCoyO6y9cRxfQowFUbpufr1ct4ZoHg+Dg067zduTmEbq4yi/UkYidDe+kaTcP4ObJIajksPd/eyx3c+N2rvPbMDPbUFPZSLKzcGjKPrbJaDsu+dQO3msfZzeGY2TCvKGYQhdSYeeJjUt21dIcjXQ7U7Kv599f4j/oF55W4g/2e3b8AAAAASUVORK5CYII=',
-        tick: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC',
+        save: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAGrSURBVDjLvZPZLkNhFIV75zjvYm7VGFNCqoZUJ+roKUUpjRuqp61Wq0NKDMelGGqOxBSUIBKXWtWGZxAvobr8lWjChRgSF//dv9be+9trCwAI/vIE/26gXmviW5bqnb8yUK028qZjPfoPWEj4Ku5HBspgAz941IXZeze8N1bottSo8BTZviVWrEh546EO03EXpuJOdG63otJbjBKHkEp/Ml6yNYYzpuezWL4s5VMtT8acCMQcb5XL3eJE8VgBlR7BeMGW9Z4yT9y1CeyucuhdTGDxfftaBO7G4L+zg91UocxVmCiy51NpiP3n2treUPujL8xhOjYOzZYsQWANyRYlU4Y9Br6oHd5bDh0bCpSOixJiWx71YY09J5pM/WEbzFcDmHvwwBu2wnikg+lEj4mwBe5bC5h1OUqcwpdC60dxegRmR06TyjCF9G9z+qM2uCJmuMJmaNZaUrCSIi6X+jJIBBYtW5Cge7cd7sgoHDfDaAvKQGAlRZYc6ltJlMxX03UzlaRlBdQrzSCwksLRbOpHUSb7pcsnxCCwngvM2Rm/ugUCi84fycr4l2t8Bb6iqTxSCgNIAAAAAElFTkSuQmCC',
+        reset: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAIJSURBVDjLpVM9aJNRFD35GsRSoUKKzQ/B0NJJF3EQlKrVgijSCBmC4NBFKihIcXBwEZdSHVoUwUInFUEkQ1DQ4CKiFsQsTrb5xNpgaZHw2Uog5t5zn0NJNFaw0guX97hwzuPcc17IOYfNlIdNVrhxufR6xJkZjAbSQGXjNAorqixSWFDV3KPhJ+UGLtSQMPryrDscPwLnAHOEOQc6gkbUpIagGmApWIb/pZRX4fjj889nWiSQtgYyBZ1BTUEj6AjPa0P71nb0Jfqwa+futIheHrzRn2yRQCUK/lOQhApBJVQJChHfnkCqOwWEQ+iORJHckUyX5ksvAEyGNuJC+s6xCRXNHNxzKMmQ4luwgjfvZp69uvr2+IZcyJ8rjIporrxURggetnV0QET3rrPxzMNM2+n7p678jUTrCiWhphAjVHR9DlR0WkSzf4IHxg5MSF0zXZEuVKWKSlCBCostS8zeG7oV64wPqxInbw86lbVXKEQ8mkAqmUJ4SxieeVhcnANFC02C7N2h69HO2IXeWC8MDj2JnqaFNAMd8f3HKjx6+LxQRmnOz1OZaxKIaF1VISYwB9ARZoQaYY6o1WpYCVYxt+zDn/XzVBv/MOWXW5J44ubRyVgkelFpmF/4BJVfOVDlVyqLVBZI5manPjajDOdcswfG9k/3X9v3/vfZv7rFBanriIo++J/f+BMT+YWS6hXl7QAAAABJRU5ErkJggg==',
+        close: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACdklEQVR4nH2RzWucVRjFf899ZyaTNE0FC6K0LjIV/AJBF4IglcFWBTdON1WkDSS48A8QxBYrKIKgSzdiAonBKk0DxUVpQaFQwUU3opAaEmmxCEUqMk1m5r3Ph4smr50ontXlnOecc+9zBeCFr9Z3IRwI5+aFo5O/8z84fHp9nyTuC+fXC0cnb8mh02v3jBb8OSpOGYnbSufiq63l/zI//+VaZ3ctlkYEeiH0lPuTWjw0EkqBMSaZ8cLOthdXX9lpbi+uHtld2NKYKIIygqIerRThf/TNMXOyBo1QxpOdfW7+ahVycP5qZzzZmUYoWQM3p6dOuN8UgGfnV6Ymks+NFk4gCEHPEn9lXgbSnjrnhjRPdFWmLx1/ZFa2W56Z/XlqorC5ZiEEIMCmQgKaNSqub0E3p+nLM4/PssVVePqzH6fGC5trJsEjkC01AkSE0oOupukf3nhidtszFADw5KdXXpuox2IjpSF+4M7tLMeuvPnUwt18bWeAltotBSQFEVstAvnOkm/tnB+qeezjy51m4edqEagp5oa5oabUCJri3zz6yfdDX1w94eGPLh0ZaxRntpcIUOqdU6Mm1XDfgs1SOytvHVyuAg58+F1nV6NYqichIhARsgebpR9HpDdWl6//rWln9e32sky+f/GBZr12o1lLVXM2Y7NkZv1E+3OA1gffvj5aZ6FeFP/cRJ1etn3J3O+VCLI5ak5/oHQHWpkB1t5pf9Et7Vi/VNScbI5EEO57UwTXB2qoGv2sbOQ8c+3k4cq8jWsnDi1sDHSqnxVVo1dmImJFAPafOv9gRLSAG7+999IvO813Y/+751tB7E0iP10/9eLG328sUoT0ZNvDAAAAAElFTkSuQmCC',
+        reload: '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',
         home: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAACB0RVh0U29mdHdhcmUATWFjcm9tZWRpYSBGaXJld29ya3MgTVi7kSokAAAAFnRFWHRDcmVhdGlvbiBUaW1lADExLzA1LzA33bqJ2wAAAlxJREFUeJx9U0tIVGEU/v7fe30wLQxCDKdykmrUCiqTIgrG1pGBMElto1VQyySMWhVl0qJNix6QGLhQWom6isRHE5SWBWLFNGqlmTWOd+bOf85pcfU6I9WBsznn+77z4BwlIsi1089e791QWHDNVqrOUggaJiQzJpFyTSzpmqsDZ46M5eJVrsC53rfdtlaNsa+/EE86cMnL2VqhrMRCKGDDMdTTf/boqTyBqcXl4ruvPk9O/VwODs0s4n8WClgotZDYF5Adt5siaQ0AN4Y/dv6NHA1vRntDdV7sU8pgLk3B5wumEwDUhf53Bw3L6NMPs+vI5WiPhMECdL2ZwqWhL3n5qkICMdcXhKPnH43NJasW0tk88p1IGCwCFmBXWSm22IS+xG8fYwRQTJV6Y1FBTTzp/IO85id3V+JmfYWPS7GCJlNjEUvF6raj4XK0RcIgETCL3wGLQERwonYbWASXX86AoWCIKrRh8lUvHqj0iJxbncEinqgIjm0vh/1jxhuDGDqTpWlbKwDA4Y5h0AqYRPDwxRgeD46vibHg+K0OaGcJSgRZ4mk957gTZSWW30UuuK1vBG19IyAWz1eOLhPcCYtcuNATulijJRSwfQFaGWEVnN5anbfMVdPpFEw226K7mg7FHEM9oYDld0DrwMTsdwEAVnoJWZae+dbmmAUADZsKmwe+OZPBIhUMPxhEcfx93tHsfzLqx7QCOOMk3Nl4M7Dumerv93cLc+N3o5BiBYa3XCUCi1zodMqrfCWa/0y5Vnuvdw+YrgtRHZEJGmK4jERWJGZEtc63NI3n4v8As6uX85AjWHEAAAAASUVORK5CYII='
     },
     stylesheets: {
