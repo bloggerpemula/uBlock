@@ -19,13 +19,11 @@
 function MonkeyConfig(data) {
     let cfg = this, params = data.parameters || data.params, values = {}, storageKey,
         displayed, openLayer, shadowRoot, container, iframeFallback;
-
     function log(message) {console.log(`[MonkeyConfig v2.1] ${message}`);}
     function init() {
         data.buttons = data.buttons || ['save', 'reset', 'close', 'reload', 'homepage'];
         storageKey = '_MonkeyConfig_' + (data.title || 'Configuration').replace(/[^a-zA-Z0-9]/g, '_') + '_cfg';
         const storedValues = GM_getValue(storageKey) ? JSON.parse(GM_getValue(storageKey)) : {};
-
         cfg.shadowWidth = data.shadowWidth || storedValues.shadowWidth || "600px";
         cfg.shadowHeight = data.shadowHeight || storedValues.shadowHeight || "300px";
         cfg.iframeWidth = data.iframeWidth || storedValues.iframeWidth || "600px";
@@ -35,9 +33,6 @@ function MonkeyConfig(data) {
         cfg.iframeFontSize = data.iframeFontSize || storedValues.iframeFontSize || "14px";
         cfg.iframeFontColor = data.iframeFontColor || storedValues.iframeFontColor || "#000000";
         cfg.title = data.title || (typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration');
-
-        log(`Initialized with title: ${cfg.title}, shadowWidth: ${cfg.shadowWidth}, shadowHeight: ${cfg.shadowHeight}, iframeWidth: ${cfg.iframeWidth}, iframeHeight: ${cfg.iframeHeight}, iframeFontSize: ${cfg.iframeFontSize}`);
-
         for (let key in params) {
             const param = params[key];
             values[key] = storedValues[key] ?? param.default ?? '';}
@@ -112,7 +107,6 @@ function MonkeyConfig(data) {
             }
         }
     }
-
     function saveClick() {
         const root = shadowRoot || (iframeFallback && iframeFallback.contentDocument);
         for (let key in params) {
@@ -165,15 +159,12 @@ function MonkeyConfig(data) {
             log("Body not found, cannot open dialog");
             return;
         }
-
         openLayer = document.createElement('div');
         openLayer.className = '__MonkeyConfig_layer';
         shadowRoot = openLayer.attachShadow({ mode: 'open' });
-
         const shadowWidth = cfg.shadowWidth || "600px";
         const shadowHeight = cfg.shadowHeight || "300px";
         log(`Preparing Shadow DOM with title: ${cfg.title}, dimensions - Width: ${shadowWidth}, Height: ${shadowHeight}`);
-
         const heightStyle = shadowHeight === 'auto' ? 'auto' : shadowHeight;
         shadowRoot.innerHTML = `
             <style>
@@ -190,21 +181,17 @@ function MonkeyConfig(data) {
         openLayer.style.cssText = 'position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; z-index: 2147483647 !important;';
         body.appendChild(openLayer);
         log('Dialog appended to body via Shadow DOM');
-
         const appliedWidth = container.offsetWidth;
         const appliedHeight = container.offsetHeight;
         log(`Actual applied dimensions - Width: ${appliedWidth}px, Height: ${appliedHeight}px`);
-
         if (!container || shadowRoot.querySelector('.__MonkeyConfig_overlay').offsetHeight === 0) {
             log('Shadow DOM failed, switching to iframe fallback');
             body.removeChild(openLayer);
             shadowRoot = null;
             iframeFallback = document.createElement('iframe');
-
             const iframeWidth = cfg.iframeWidth || "600px";
             const iframeHeight = cfg.iframeHeight || "300px";
             log(`Switching to iframe with dimensions - Width: ${iframeWidth}, Height: ${iframeHeight}`);
-
             iframeFallback.style.cssText = `position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; width: ${iframeWidth} !important; height: ${iframeHeight} !important; max-width: 90vw !important; max-height: 80vh !important; z-index: 2147483647 !important; border: none !important; background: #eee !important; box-shadow: 2px 2px 16px #000 !important; border-radius: 0.5em !important;`;
             body.appendChild(iframeFallback);
             const iframeDoc = iframeFallback.contentDocument;
@@ -232,7 +219,6 @@ function MonkeyConfig(data) {
             iframeDoc.close();
             openLayer = iframeFallback;
             openDone(iframeDoc);
-
             const iframeAppliedWidth = iframeFallback.offsetWidth;
             const iframeAppliedHeight = iframeFallback.offsetHeight;
             log(`Iframe actual applied dimensions - Width: ${iframeAppliedWidth}px, Height: ${iframeAppliedHeight}px`);
@@ -240,15 +226,12 @@ function MonkeyConfig(data) {
             openDone(shadowRoot);
         }
     }
-
     function close() {
         if (openLayer) openLayer.parentNode.removeChild(openLayer);
         openLayer = shadowRoot = iframeFallback = undefined;
         displayed = false;
     }
-
     init();}
-
 MonkeyConfig.esc = string => string.replace(/"/g, '"');
 MonkeyConfig.HTML = {
     _field: (name, opt) => opt.type && MonkeyConfig.HTML[opt.type] ? (opt.html ? opt.html.replace(/\[FIELD\]/, MonkeyConfig.HTML[opt.type](name, opt)) : MonkeyConfig.HTML[opt.type](name, opt)) : '',
