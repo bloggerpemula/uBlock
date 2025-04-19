@@ -4,18 +4,17 @@
 // @version         2.2
 // @namespace       http://odyniec.net/
 // @contributionURL https://saweria.co/Bloggerpemula
-// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, additional input types, scrollable labels, and customizable checkbox/number sizes and positions
+// @description     Enhanced Configuration Dialog Builder with column layout, custom styling, scrollable labels, customizable checkbox/number sizes, and additional column options
 // ==/UserScript==
 /*
  * MonkeyConfig Enhanced
  * Based on version 0.1.4 by Michal Wojciechowski (odyniec.net)
  * v0.1.4 - January 2020 - David Hosier (https://github.com/david-hosier/MonkeyConfig)
  * Enhanced by Bloggerpemula - March 2025
- * Further Modified - April 2025
- * Additions: 
- * - Horizontal scrolling for labels when width/height is reduced
- * - Customizable width/height for checkbox and number inputs
- * - New column layouts: left&top, right&top, left&bottom, right&bottom
+ * Additions: Column layout, font size/color customization, new input types (textarea, range, radio, file, button, group)
+ * Modified: Checkbox, number, and text inputs aligned inline with labels - March 2025
+ * Fixed: Improved Shadow DOM and Optimized Iframe for consistent styling across sites - March 2025
+ * Enhanced: Scrollable labels, customizable checkbox/number sizes, new column options (left&top, right&top, left&bottom, right&bottom) - April 2025
  */
 function MonkeyConfig(data) {
     let cfg = this, params = data.parameters || data.params, values = {}, storageKey,
@@ -48,19 +47,19 @@ function MonkeyConfig(data) {
     function render() {
         let html = `<div class="__MonkeyConfig_container"><h1>${cfg.title}</h1><div class="__MonkeyConfig_content"><div class="__MonkeyConfig_top">`;
         for (let key in params) if (params[key].column === 'top') html += MonkeyConfig.formatters.tr(key, params[key]);
-        html += `</div><div class="__MonkeyConfig_columns"><div class="__MonkeyConfig_left_column">`;
-        for (let key in params) if (params[key].column === 'left' || params[key].column === 'left&top' || params[key].column === 'left&bottom') html += MonkeyConfig.formatters.tr(key, params[key]);
-        html += `</div><div class="__MonkeyConfig_right_column">`;
-        for (let key in params) if (params[key].column === 'right' || params[key].column === 'right&top' || params[key].column === 'right&bottom') html += MonkeyConfig.formatters.tr(key, params[key]);
-        html += `</div></div><div class="__MonkeyConfig_left_top">`;
+        html += `</div><div class="__MonkeyConfig_columns"><div class="__MonkeyConfig_left_top">`;
         for (let key in params) if (params[key].column === 'left&top') html += MonkeyConfig.formatters.tr(key, params[key]);
         html += `</div><div class="__MonkeyConfig_right_top">`;
         for (let key in params) if (params[key].column === 'right&top') html += MonkeyConfig.formatters.tr(key, params[key]);
-        html += `</div><div class="__MonkeyConfig_left_bottom">`;
+        html += `</div></div><div class="__MonkeyConfig_columns"><div class="__MonkeyConfig_left_column">`;
+        for (let key in params) if (params[key].column === 'left') html += MonkeyConfig.formatters.tr(key, params[key]);
+        html += `</div><div class="__MonkeyConfig_right_column">`;
+        for (let key in params) if (params[key].column === 'right') html += MonkeyConfig.formatters.tr(key, params[key]);
+        html += `</div></div><div class="__MonkeyConfig_columns"><div class="__MonkeyConfig_left_bottom">`;
         for (let key in params) if (params[key].column === 'left&bottom') html += MonkeyConfig.formatters.tr(key, params[key]);
         html += `</div><div class="__MonkeyConfig_right_bottom">`;
         for (let key in params) if (params[key].column === 'right&bottom') html += MonkeyConfig.formatters.tr(key, params[key]);
-        html += `</div><table class="__MonkeyConfig_default">`;
+        html += `</div></div><table class="__MonkeyConfig_default">`;
         for (let key in params) if (!params[key].column) html += MonkeyConfig.formatters.tr(key, params[key]);
         html += `</table><div class="__MonkeyConfig_bottom">`;
         for (let key in params) if (params[key].column === 'bottom') html += MonkeyConfig.formatters.tr(key, params[key]);
@@ -81,12 +80,24 @@ function MonkeyConfig(data) {
         for (let key in params) {
             const elem = root.querySelector(`[name="${key}"]`), param = params[key];
             if (!elem) continue;
-            if (param.type === 'checkbox') elem.checked = !!values[key];
-            else if (param.type === 'custom' && param.set) param.set(values[key], root.querySelector(`#__MonkeyConfig_parent_${key}`));
-            else if (['number', 'text', 'color', 'textarea', 'range'].includes(param.type)) elem.value = values[key] || param.default;
-            else if (param.type === 'radio') { const radio = root.querySelector(`[name="${key}"][value="${values[key]}"]`); if (radio) radio.checked = true; }
-            else if (param.type === 'file') elem.value = '';
-            else if (param.type === 'select') {
+            if (param.type === 'checkbox') {
+                elem.checked = !!values[key];
+                elem.style.width = param.width || '11px';
+                elem.style.height = param.height || '11px';
+            } else if (param.type === 'number') {
+                elem.value = values[key] || param.default;
+                elem.style.width = param.width || '40px';
+                elem.style.height = param.height || '20px';
+            } else if (param.type === 'custom' && param.set) {
+                param.set(values[key], root.querySelector(`#__MonkeyConfig_parent_${key}`));
+            } else if (['text', 'color', 'textarea', 'range'].includes(param.type)) {
+                elem.value = values[key] || param.default;
+            } else if (param.type === 'radio') {
+                const radio = root.querySelector(`[name="${key}"][value="${values[key]}"]`);
+                if (radio) radio.checked = true;
+            } else if (param.type === 'file') {
+                elem.value = '';
+            } else if (param.type === 'select') {
                 const currentValue = values[key];
                 if (elem.type === 'checkbox') {
                     const checkboxes = root.querySelectorAll(`input[name="${key}"]`);
@@ -101,15 +112,7 @@ function MonkeyConfig(data) {
             const labelFontColor = param.fontColor || defaultFontColor;
             elem.style.fontSize = fontSize;
             elem.style.color = labelFontColor;
-            if (param.type === 'checkbox') {
-                elem.style.width = param.width || '11px';
-                elem.style.height = param.height || '11px';
-                elem.style.backgroundColor = 'inherit';
-                elem.style.color = labelFontColor;
-            } else if (param.type === 'number') {
-                elem.style.width = param.width || '40px';
-                elem.style.height = param.height || '20px';
-            } else if (param.type === 'textarea') {
+            if (param.type === 'checkbox' || param.type === 'textarea') {
                 elem.style.backgroundColor = 'inherit';
                 elem.style.color = labelFontColor;}
             const label = root.querySelector(`label[for="__MonkeyConfig_field_${key}"]`);
@@ -209,7 +212,8 @@ function MonkeyConfig(data) {
                 .__MonkeyConfig_overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background-color: rgba(0, 0, 0, 0.6) !important; z-index: 2147483646 !important; }
                 .__MonkeyConfig_container { position: relative !important; width: 100% !important; height: 100% !important; padding: 1em !important; box-sizing: border-box !important; overflow-y: auto !important; border-radius: 0.5em !important; font-size: ${cfg.iframeFontSize} !important; isolation: isolate !important; background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; }
                 .__MonkeyConfig_container h1 { font-size: 120% !important; font-weight: normal !important; margin: 0 !important; padding: 0 !important; display: block !important; }
-                .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] { width: 11px !important perspective: 0.3em 0.5em 0 !important; height: 11px !important; margin: 0 0.5em 0 0 !important; vertical-align: middle !important; accent-color: #007bff !important; display: inline-block !important; }
+                .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] { width: 11px !important; height: 11px !important; margin: 0 0.5em 0 0 !important; vertical-align: middle !important; accent-color: #007bff !important; display: inline-block !important; }
+                .__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"] { width: 40px !important; height: 20px !important; margin: 0 0.5em 0 0 !important; vertical-align: middle !important; display: inline-block !important; }
                 .__MonkeyConfig_container textarea { width: 100% !important; padding: 1.2em !important; border: 1px solid #ccc !important; border-radius: 0.3em !important; box-sizing: border-box !important; font-size: 20px !important; color: ${cfg.iframeFontColor} !important; resize: vertical !important; min-height: 140px !important; white-space: pre-wrap !important; display: block !important; }
                 .__MonkeyConfig_container button { background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important; border: 1px solid #999 !important; border-radius: 0.5em !important; box-shadow: 0 0 1px #000 !important; padding: 12px 16px 12px 48px !important; white-space: nowrap !important; font-size: 20px !important; color: ${cfg.iframeFontColor} !important; cursor: pointer !important; display: inline-block !important; }
                 .__MonkeyConfig_container button:hover { background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%) !important; }
@@ -259,4 +263,91 @@ MonkeyConfig.res = {
         home: 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAACB0RVh0U29mdHdhcmUATWFjcm9tZWRpYSBGaXJld29ya3MgTVi7kSokAAAAFnRFWHRDcmVhdGlvbiBUaW1lADExLzA1LzA33bqJ2wAAAlxJREFUeJx9U0tIVGEU/v7fe30wLQxCDKdykmrUCiqTIgrG1pGBMElto1VQyySMWhVl0qJNix6QGLhQWom6isRHE5SWBWLFNGqlmTWOd+bOf85pcfU6I9WBsznn+77z4BwlIsi1089e791QWHDNVqrOUggaJiQzJpFyTSzpmqsDZ46M5eJVrsC53rfdtlaNsa+/EE86cMnL2VqhrMRCKGDDMdTTf/boqTyBqcXl4ruvPk9O/VwODs0s4n8WClgotZDYF5Adt5siaQ0AN4Y/dv6NHA1vRntDdV7sU8pgLk3B5wumEwDUhf53Bw3L6NMPs+vI5WiPhMECdL2ZwqWhL3n5qkICMdcXhKPnH43NJasW0tk88p1IGCwCFmBXWSm22IS+xG8fYwRQTJV6Y1FBTTzp/IO85id3V+JmfYWPS7GCJlNjEUvF6raj4XK0RcIgETCL3wGLQERwonYbWASXX86AoWCIKrRh8lUvHqj0iJxbncEinqgIjm0vh/1jxhuDGDqTpWlbKwDA4Y5h0AqYRPDwxRgeD46vibHg+K0OaGcJSgRZ4mk957gTZSWW30UuuK1vBG19IyAWz1eOLhPcCYtcuNATulijJRSwfQFaGWEVnN5anbfMVdPpFEw226K7mg7FHEM9oYDld0DrwMTsdwEAVnoJWZae+dbmmAUADZsKmwe+OZPBIhUMPxhEcfx93tHsfzLqx7QCOOMk3Nl4M7Dumerv93cLc+N3o5BiBYa3XCUCi1zodMqrfCWa/0y5Vnuvdw+YrgtRHZEJGmK4jERWJGZEtc63NI3n4v8As6uX85AjWHEAAAAASUVORK5CYII='
     },
     stylesheets: {
-        main: `:host, body { all: initial; font-family: Arial, sans-serif !important; display: block !important; isolation: isolate; }.__MonkeyConfig_container { display: flex !important; flex-direction: column !important; padding: 1em !important; font-size: __FONT_SIZE__ !important; color: __FONT_COLOR__ !important; background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; border-radius: 0.5em !important; box-shadow: 2px 2px 16px #000 !important; box-sizing: border-box !important; }.__MonkeyConfig_container h1 { border-bottom: solid 1px #999 !important; font-size: 120% !important; font-weight: normal !important; margin: 0 0 0.5em 0 !important; padding: 0 0 0.3em 0 !important; text-align: center !important; }.__MonkeyConfig_content { flex: 1 !important; overflow-y: auto !important; max-height: 60vh !important; }.__MonkeyConfig_top, .__MonkeyConfig_bottom, .__MonkeyConfig_left_top, .__MonkeyConfig_right_top, .__MonkeyConfig_left_bottom, .__MonkeyConfig_right_bottom { margin-bottom: 1em !important; }.__MonkeyConfig_columns { display: flex !important; justify-content: space-between !important; margin-bottom: 1em !important; }.__MonkeyConfig_left_column, .__MonkeyConfig_right_column { width: 48% !important; }.__MonkeyConfig_container table { border-spacing: 0 !important; margin: 0 !important; width: 100% !important; }.__MonkeyConfig_container td { border: none !important; line-height: 100% !important; padding: 0.3em !important; text-align: left !important; vertical-align: middle !important; white-space: normal !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline { display: flex !important; align-items: center !important; white-space: nowrap !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline label { margin-right: 0.5em !important; flex-shrink: 0 !important; display: block !important; overflow-x: auto !important; white-space: nowrap !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] { flex-grow: 0 !important; margin: 0 0.3em 0 0 !important; display: inline-block !important; }.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"] { flex-grow: 0 !important; min-width: 40px !important; }.__MonkeyConfig_buttons_container { margin-top: 1em !important; border-top: solid 1px #999 !important; padding-top: 0.6em !important; text-align: center !important; }.__MonkeyConfig_buttons_container table { width: auto !important; margin: 0 auto !important; }.__MonkeyConfig_buttons_container td { padding: 0.3em !important; }.__MonkeyConfig_container button { background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important; border: solid 1px !important; border-radius: 0.5em !important; box-shadow: 0 0 1px #000 !important; padding: 3px 8px 3px 24px !important; white-space: nowrap !important; }.__MonkeyConfig_container button img { vertical-align: middle !important; }.__MonkeyConfig_container label { line-height: 120% !important; vertical-align: middle !important; display: inline-block !important; }.__MonkeyConfig_container textarea { vertical-align: text-top !important; width: 100% !important; white-space: pre-wrap !important; resize: vertical !important; text-align: left !important; }.__MonkeyConfig_container input[type="text"], .__MonkeyConfig_container input[type="number"], .__MonkeyConfig_container input[type="color"] { background: #fff !important; }.__MonkeyConfig_container button:hover { background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%) !important; }@media (max-width: 600px) { .__MonkeyConfig_columns { flex-direction: column !important; } .__MonkeyConfig_left_column, .__MonkeyConfig_right_column { width: 100% !important; } }`}};
+        main: `:host, body { all: initial; font-family: Arial, sans-serif !important; display: block !important; isolation: isolate; }
+.__MonkeyConfig_container { display: flex !important; flex-direction: column !important; padding: 1em !important; font-size: __FONT_SIZE__ !important; color: __FONT_COLOR__ !important; background: #eee linear-gradient(180deg, #f8f8f8 0, #ddd 100%) !important; border-radius: 0.5em !important; box-shadow: 2px 2px 16px #000 !important; box-sizing: border-box !important; }
+.__MonkeyConfig_container h1 { border-bottom: solid 1px #999 !important; font-size: 120% !important; font-weight: normal !important; margin: 0 0 0.5em 0 !important; padding: 0 0 0.3em 0 !important; text-align: center !important; }
+.__MonkeyConfig_content { flex: 1 !important; overflow-y: auto !important; max-height: 60vh !important; }
+.__MonkeyConfig_top, .__MonkeyConfig_bottom { margin-bottom: 1em !important; }
+.__MonkeyConfig_columns { display: flex !important; flex-direction: column !important; margin-bottom: 1em !important; }
+.__MonkeyConfig_left_top, .__MonkeyConfig_right_top, .__MonkeyConfig_left_column, .__MonkeyConfig_right_column, .__MonkeyConfig_left_bottom, .__MonkeyConfig_right_bottom { width: 100% !important; margin-bottom: 0.5em !important; }
+.__MonkeyConfig_container table { border-spacing: 0 !important; margin: 0 !important; width: 100% !important; }
+.__MonkeyConfig_container td { border: none !important; line-height: 100% !important; padding: 0.3em !important; text-align: left !important; vertical-align: middle !important; white-space: normal !important; }
+.__MonkeyConfig_container td.__MonkeyConfig_inline { display: flex !important; align-items: center !important; white-space: nowrap !important; }
+.__MonkeyConfig_container td.__MonkeyConfig_inline label { margin-right: 0.5em !important; flex-shrink: 0 !important; display: block !important; overflow-x: auto !important; white-space: nowrap !important; }
+.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="checkbox"] { flex-grow: 0 !important; margin: 0 0.3em 0 0 !important; display: inline-block !important; }
+.__MonkeyConfig_container td.__MonkeyConfig_inline input[type="number"] { flex-grow: 0 !important; min-width: 40px !important; }
+.__MonkeyConfig_buttons_container { margin-top: 1em !important; border-top: solid 1px #999 !important; padding-top: 0.6em !important; text-align: center !important; }
+.__MonkeyConfig_buttons_container table { width: auto !important; margin: 0 auto !important; }
+.__MonkeyConfig_buttons_container td { padding: 0.3em !important; }
+.__MonkeyConfig_container button { background: #ccc linear-gradient(180deg, #ddd 0, #ccc 45%, #bbb 50%, #aaa 100%) !important; border: solid 1px !important; border-radius: 0.5em !important; box-shadow: 0 0 1px #000 !important; padding: 3px 8px 3px 24px !important; white-space: nowrap !important; }
+.__MonkeyConfig_container button img { vertical-align: middle !important; }
+.__MonkeyConfig_container label { line-height: 120% !important; vertical-align: middle !important; display: inline-block !important; overflow-x: auto !important; white-space: nowrap !important; }
+.__MonkeyConfig_container textarea { vertical-align: text-top !important; width: 100% !important; white-space: pre-wrap !important; resize: vertical !important; text-align: left !important; }
+.__MonkeyConfig_container input[type="text"], .__MonkeyConfig_container input[type="number"], .__MonkeyConfig_container input[type="color"] { background: #fff !important; }
+.__MonkeyConfig_container button:hover { background: #d2d2d2 linear-gradient(180deg, #e2e2e2 0, #d2d2d2 45%, #c2c2c2 50%, #b2b2b2 100%) !important; }
+@media (max-width: 600px) {
+    .__MonkeyConfig_columns { flex-direction: column !important; }
+    .__MonkeyConfig_left_top, .__MonkeyConfig_right_top, .__MonkeyConfig_left_column, .__MonkeyConfig_right_column, .__MonkeyConfig_left_bottom, .__MonkeyConfig_right_bottom { width: 100% !important; }
+}`}};
+
+// Example Usage
+const config = new MonkeyConfig({
+    title: 'Sample Configuration',
+    shadowWidth: '400px',
+    shadowHeight: '500px',
+    iframeWidth: '400px',
+    iframeHeight: '500px',
+    shadowFontSize: '16px',
+    iframeFontSize: '16px',
+    menuCommand: true,
+    parameters: {
+        enable_feature: {
+            type: 'checkbox',
+            label: 'Enable Advanced Feature with Long Description Text',
+            default: false,
+            column: 'left&top',
+            width: '15px',
+            height: '15px'
+        },
+        volume_level: {
+            type: 'number',
+            label: 'Volume Level (0-100) Long Description',
+            default: 50,
+            min: 0,
+            max: 100,
+            column: 'right&top',
+            width: '50px',
+            height: '25px'
+        },
+        user_name: {
+            type: 'text',
+            label: 'User Name with Very Long Description Text',
+            default: '',
+            column: 'left'
+        },
+        theme_color: {
+            type: 'color',
+            label: 'Theme Color Long Descriptive Text',
+            default: '#ff0000',
+            column: 'right'
+        },
+        description: {
+            type: 'textarea',
+            label: 'Description with Long Label Text',
+            default: '',
+            column: 'left&bottom',
+            rows: 5
+        },
+        frequency: {
+            type: 'range',
+            label: 'Frequency Adjustment Long Text',
+            default: 50,
+            min: 0,
+            max: 100,
+            column: 'right&bottom'
+        }
+    },
+    onSave: values => {
+        console.log('Configuration saved:', values);
+    }
+});
