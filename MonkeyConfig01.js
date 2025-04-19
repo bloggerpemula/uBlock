@@ -1,4 +1,3 @@
-```
 // ==UserScript==
 // @name            MonkeyConfig Mod Enhanced
 // @noframes
