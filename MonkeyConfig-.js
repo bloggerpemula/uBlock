@@ -113,6 +113,10 @@ function MonkeyConfig(data) {
         elem.value = values[key] || param.default;
         elem.style.width = param.inputWidth || '40px';
         elem.style.height = param.inputHeight || '20px';
+      } else if (param.type === 'text') {
+        elem.value = values[key] || param.default;
+        elem.style.width = param.inputWidth || '100px';
+        elem.style.height = param.inputHeight || '20px';
       } else if (param.type === 'custom' && param.set) param.set(values[key], root.querySelector(`#__MonkeyConfig_parent_${key}`));
       else if (['text', 'color', 'textarea', 'range'].includes(param.type)) elem.value = values[key] || param.default;
       else if (param.type === 'radio') {
