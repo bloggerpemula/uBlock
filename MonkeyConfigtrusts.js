@@ -18,6 +18,8 @@
  * Fixed: Improved Shadow DOM and Optimized Iframe for consistent styling across sites - March 2025
  * Enhanced: Scrollable labels, customizable checkbox/number sizes, new column options (left&top, right&top, left&bottom, right&bottom) - April 2025
  * Security: Enhanced Trusted Types support, strict DOMPurify sanitization, CSP for iframe, and robust error handling - May 2025
+ * Fixed: Fallback for missing Trusted Types or DOMPurify to ensure script execution - May 2025
+ * Fixed: Prevent recursion in group rendering and DOMException in close function - May 2025
  */
 function MonkeyConfig(data) {
   let cfg = this,
@@ -65,7 +67,6 @@ function MonkeyConfig(data) {
   // Fungsi sanitasi fallback sederhana jika DOMPurify tidak tersedia
   function fallbackSanitize(input) {
     try {
-      // Sanitasi dasar: hapus tag berbahaya dan atribut berisiko
       return String(input)
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
         .replace(/on\w+\s*=\s*['"][^'"]*['"]/gi, '')
@@ -82,7 +83,6 @@ function MonkeyConfig(data) {
       if (trustedPolicy) {
         return trustedPolicy.createHTML(htmlString);
       }
-      // Fallback: gunakan DOMPurify jika tersedia, jika tidak gunakan sanitasi sederhana
       if (window.DOMPurify) {
         return window.DOMPurify.sanitize(htmlString);
       }
@@ -117,8 +117,15 @@ function MonkeyConfig(data) {
       cfg.iframeFontColor = data.iframeFontColor || storedValues.iframeFontColor || "#000000";
       cfg.title = data.title || (typeof GM_getMetadata === 'function' ? GM_getMetadata('name') + ' Configuration' : 'Configuration');
 
+      // Validasi params untuk mencegah circular references
       for (let key in params) {
         const param = params[key];
+        if (param.type === 'group' && param.params) {
+          if (param.params[key]) {
+            log(`Circular reference detected in group param: ${key}`, 'error');
+            delete param.params[key]; // Hapus referensi circular
+          }
+        }
         values[key] = storedValues[key] ?? param.default ?? '';
       }
 
@@ -504,7 +511,9 @@ function MonkeyConfig(data) {
         openDone(shadowRoot);
       } catch (e) {
         log(`Shadow DOM failed: ${e.message}, switching to iframe fallback`, 'warn');
-        body.removeChild(openLayer);
+        if (openLayer && openLayer.parentNode) {
+          openLayer.parentNode.removeChild(openLayer);
+        }
         shadowRoot = null;
       }
     }
@@ -563,7 +572,9 @@ function MonkeyConfig(data) {
         log(`Iframe actual applied dimensions - Width: ${iframeAppliedWidth}px, Height: ${iframeAppliedHeight}px`);
       } catch (e) {
         log(`Iframe rendering failed: ${e.message}`, 'error');
-        body.removeChild(iframeFallback);
+        if (iframeFallback && iframeFallback.parentNode) {
+          iframeFallback.parentNode.removeChild(iframeFallback);
+        }
         iframeFallback = null;
         close();
       }
@@ -572,8 +583,11 @@ function MonkeyConfig(data) {
 
   function close() {
     try {
-      if (openLayer && openLayer.parentNode) {
+      if (openLayer && openLayer.parentNode && document.body.contains(openLayer)) {
         openLayer.parentNode.removeChild(openLayer);
+        log('Dialog successfully closed', 'info');
+      } else {
+        log('Open layer not found or already removed', 'warn');
       }
       openLayer = shadowRoot = iframeFallback = undefined;
       displayed = false;
@@ -587,7 +601,8 @@ function MonkeyConfig(data) {
 
 MonkeyConfig.esc = function esc(string) {
   try {
-    return String(string).replace(/&/g, '&amp;')
+    return String(string)
+      .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
@@ -600,9 +615,9 @@ MonkeyConfig.esc = function esc(string) {
 
 MonkeyConfig.log = function log(message, level = 'info') {
   try {
-    console[level](`[MonkeyConfig v2.5] ${message}`);
+    console[level](`[MonkeyConfig v2.4] ${message}`);
   } catch (e) {
-    console.error(`[MonkeyConfig v2.5] Logging failed: ${e.message}`);
+    console.error(`[MonkeyConfig v2.4] Logging failed: ${e.message}`);
   }
 };
 
@@ -670,11 +685,15 @@ MonkeyConfig.HTML = {
   button: function button(name, opt) {
     return MonkeyConfig.createTrustedHTML(`<button type="button" id="__MonkeyConfig_field_${MonkeyConfig.esc(name)}" name="${MonkeyConfig.esc(name)}">${MonkeyConfig.esc(opt.label || 'Click')}</button>`);
   },
-  group: function group(name, opt) {
+  group: function group(name, opt, depth = 0) {
     try {
+      if (depth > 10) {
+        MonkeyConfig.log(`Max recursion depth exceeded for group ${name}`, 'error');
+        return MonkeyConfig.createTrustedHTML('');
+      }
       const html = `<fieldset><legend>${MonkeyConfig.esc(opt.label || name)}</legend>${
-        Object.entries(opt.params).map(([subName, subOpt]) =>
-          MonkeyConfig.formatters.tr(subName, subOpt)
+        Object.entries(opt.params || {}).map(([subName, subOpt]) =>
+          MonkeyConfig.formatters.tr(subName, subOpt, depth + 1)
         ).join('')
       }</fieldset>`;
       return MonkeyConfig.createTrustedHTML(html);
@@ -703,11 +722,15 @@ MonkeyConfig.HTML = {
 };
 
 MonkeyConfig.formatters = {
-  tr: function tr(name, opt) {
+  tr: function tr(name, opt, depth = 0) {
     try {
+      if (depth > 10) {
+        MonkeyConfig.log(`Max recursion depth exceeded for table row ${name}`, 'error');
+        return MonkeyConfig.createTrustedHTML('');
+      }
       const html = `<tr>${
         ['checkbox', 'number', 'text'].includes(opt.type) ? `<td id="__MonkeyConfig_parent_${MonkeyConfig.esc(name)}" colspan="2" class="__MonkeyConfig_inline">${MonkeyConfig.HTML._label(name, opt)} ${MonkeyConfig.HTML._field(name, opt)}</td>` :
-        opt.type === 'group' ? `<td colspan="2">${MonkeyConfig.HTML._field(name, opt)}</td>` :
+        opt.type === 'group' ? `<td colspan="2">${MonkeyConfig.HTML.group(name, opt, depth)}</td>` :
         `<td>${MonkeyConfig.HTML._label(name, opt)}</td><td id="__MonkeyConfig_parent_${MonkeyConfig.esc(name)}">${MonkeyConfig.HTML._field(name, opt)}</td>`
       }</tr>`;
       return MonkeyConfig.createTrustedHTML(html);
