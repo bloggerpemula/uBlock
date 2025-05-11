@@ -40,33 +40,57 @@ function MonkeyConfig(data) {
   }
 
   // Kebijakan Trusted Types dengan sanitasi DOMPurify
-  let trustedPolicy;
+  let trustedPolicy = null;
   try {
-    if (!window.trustedTypes || !DOMPurify) {
-      throw new Error('Trusted Types or DOMPurify not available');
-    }
-    trustedPolicy = window.trustedTypes.createPolicy('monkeyConfigPolicy', {
-      createHTML: (input) => {
-        return DOMPurify.sanitize(input, { RETURN_TRUSTED_TYPE: true });
-      },
-      createScript: (input) => input, // Tidak digunakan, hanya untuk kepatuhan
-      createScriptURL: (input) => input // Tidak digunakan, hanya untuk kepatuhan
-    });
-    if (!trustedPolicy) {
-      throw new Error('Trusted Types policy creation failed');
+    if (window.trustedTypes && window.DOMPurify) {
+      trustedPolicy = window.trustedTypes.createPolicy('monkeyConfigPolicy', {
+        createHTML: (input) => {
+          return window.DOMPurify.sanitize(input, { RETURN_TRUSTED_TYPE: true });
+        },
+        createScript: (input) => input, // Tidak digunakan, hanya untuk kepatuhan
+        createScriptURL: (input) => input // Tidak digunakan, hanya untuk kepatuhan
+      });
+      if (!trustedPolicy) {
+        throw new Error('Trusted Types policy creation failed');
+      }
+      log('Trusted Types policy created successfully', 'info');
+    } else {
+      log('Trusted Types or DOMPurify not available, using fallback sanitization', 'warn');
     }
   } catch (e) {
-    log(`Failed to create Trusted Types policy: ${e.message}`, 'error');
-    throw new Error('Trusted Types or DOMPurify not supported, halting execution');
+    log(`Failed to create Trusted Types policy: ${e.message}, using fallback sanitization`, 'warn');
+    trustedPolicy = null;
   }
 
-  // Fungsi untuk menghasilkan TrustedHTML
+  // Fungsi sanitasi fallback sederhana jika DOMPurify tidak tersedia
+  function fallbackSanitize(input) {
+    try {
+      // Sanitasi dasar: hapus tag berbahaya dan atribut berisiko
+      return String(input)
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/on\w+\s*=\s*['"][^'"]*['"]/gi, '')
+        .replace(/javascript:/gi, '');
+    } catch (e) {
+      log(`Fallback sanitization failed: ${e.message}`, 'error');
+      return '';
+    }
+  }
+
+  // Fungsi untuk menghasilkan TrustedHTML atau HTML yang telah disanitasi
   function createTrustedHTML(htmlString) {
     try {
-      return trustedPolicy.createHTML(htmlString);
+      if (trustedPolicy) {
+        return trustedPolicy.createHTML(htmlString);
+      }
+      // Fallback: gunakan DOMPurify jika tersedia, jika tidak gunakan sanitasi sederhana
+      if (window.DOMPurify) {
+        return window.DOMPurify.sanitize(htmlString);
+      }
+      log('Using fallback sanitization due to missing Trusted Types and DOMPurify', 'warn');
+      return fallbackSanitize(htmlString);
     } catch (e) {
       log(`Failed to create TrustedHTML: ${e.message}`, 'error');
-      throw new Error('Failed to create TrustedHTML');
+      return fallbackSanitize(htmlString);
     }
   }
 
@@ -334,7 +358,7 @@ function MonkeyConfig(data) {
             continue;
           }
         } else if (['text', 'textarea'].includes(param.type)) {
-          value = DOMPurify.sanitize(elem.value); // Sanitasi input pengguna
+          value = window.DOMPurify ? window.DOMPurify.sanitize(elem.value) : fallbackSanitize(elem.value);
         } else if (['number', 'color', 'range'].includes(param.type)) {
           value = elem.value;
         } else if (param.type === 'radio') {
@@ -576,9 +600,9 @@ MonkeyConfig.esc = function esc(string) {
 
 MonkeyConfig.log = function log(message, level = 'info') {
   try {
-    console[level](`[MonkeyConfig v2.4] ${message}`);
+    console[level](`[MonkeyConfig v2.5] ${message}`);
   } catch (e) {
-    console.error(`[MonkeyConfig v2.4] Logging failed: ${e.message}`);
+    console.error(`[MonkeyConfig v2.5] Logging failed: ${e.message}`);
   }
 };
 
@@ -695,35 +719,9 @@ MonkeyConfig.formatters = {
 };
 
 MonkeyConfig.createTrustedHTML = function createTrustedHTML(htmlString) {
-  try {
-    return MonkeyConfig.trustedPolicy.createHTML(htmlString);
-  } catch (e) {
-    MonkeyConfig.log(`Failed to create TrustedHTML: ${e.message}`, 'error');
-    throw new Error('Failed to create TrustedHTML');
-  }
+  return createTrustedHTML(htmlString); // Panggil fungsi lokal
 };
 
-MonkeyConfig.trustedPolicy = (function () {
-  try {
-    if (!window.trustedTypes || !DOMPurify) {
-      throw new Error('Trusted Types or DOMPurify not available');
-    }
-    const policy = window.trustedTypes.createPolicy('monkeyConfigPolicy', {
-      createHTML: (input) => {
-        return DOMPurify.sanitize(input, { RETURN_TRUSTED_TYPE: true });
-      },
-      createScript: (input) => input, // Tidak digunakan, hanya untuk kepatuhan
-      createScriptURL: (input) => input // Tidak digunakan, hanya untuk kepatuhan
-    });
-    if (!policy) {
-      throw new Error('Trusted Types policy creation failed');
-    }
-    return policy;
-  } catch (e) {
-    MonkeyConfig.log(`Failed to create Trusted Types policy: ${e.message}`, 'error');
-    throw new Error('Trusted Types or DOMPurify not supported, halting execution');
-  }
-})();
 
   MonkeyConfig.res = {
   icons: {
@@ -762,4 +760,5 @@ MonkeyConfig.trustedPolicy = (function () {
     .__MonkeyConfig_left_column, .__MonkeyConfig_right_column, .__MonkeyConfig_left_top, .__MonkeyConfig_right_top, .__MonkeyConfig_left_bottom, .__MonkeyConfig_right_bottom { width: 100% !important; }
     .__MonkeyConfig_container label { animation: scroll-text 10s linear infinite; }
     @keyframes scroll-text { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
-}`}};
+}`
+}};
